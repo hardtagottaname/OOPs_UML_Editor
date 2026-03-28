@@ -179,34 +179,63 @@ public class Main extends JFrame {
 
             g2d.setColor(Color.BLACK);
             
-            for (Shape shape : shapes) {
-                // 判斷是否為選取狀態
-                boolean isShapeHovered = (hoverShape == shape);
-                boolean isShapeSelected = selectedShapes.contains(shape);
-                
-                if (isShapeSelected || isShapeHovered) {
-                    // 1. 畫選取框 (例如：粗輪廓或虛線框)
-                    g2d.setColor(Color.BLUE);
-                    g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{5}, 0));
-                    g2d.draw(shape);
-                    
-                    // 2. Case C 定義：顯示所有 Ports
-                    // 從 map 中獲取該 shape 的 ports 並畫出來
-                    ArrayList<Port> ports = shapePortsMap.get(shape);
-                    if (ports != null) {
-                        for (Port port : ports) {
-                            // 畫一個小方塊代表 Port
-                            g2d.setColor(Color.WHITE);
-                            g2d.fill(new Rectangle(port.x - 3, port.y - 3, 6, 6));
-                            g2d.setColor(Color.BLACK);
-                            g2d.draw(new Rectangle(port.x - 3, port.y - 3, 6, 6));
+            
+            for (Object obj : shapes) { // 注意：這裡迴圈變數改為 Object
+                boolean isShapeSelected = selectedShapes.contains(obj);
+                boolean isShapeHovered = (hoverShape == obj);
+
+                if (obj instanceof Shape) {
+                    Shape shape = (Shape) obj;
+                    // 這是原本的基本物件繪製邏輯
+                    if (isShapeSelected || isShapeHovered) {
+                        g2d.setColor(Color.BLUE);
+                        g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{5}, 0));
+                        g2d.draw(shape);
+                        
+                        // Case C: 顯示 Ports (只有基本物件顯示 Port)
+                        boolean showPort = true;
+                        for (Shape s : shapes) {
+                            if (s instanceof CompositeShape) {
+                                CompositeShape group = (CompositeShape) s;
+                                if (group.getChildren().contains(shape)) {
+                                    showPort = false; // 如果 shape 在群組內，隱藏 Port
+                                    break;
+                                }
+                            }
                         }
+
+                        if (showPort) {
+                            ArrayList<Port> ports = shapePortsMap.get(shape);
+                            if (ports != null) {
+                                for (Port port : ports) {
+                                    g2d.setColor(Color.WHITE); 
+                                    g2d.fill(new Rectangle(port.x - 3, port.y - 3, 6, 6));
+                                    g2d.setColor(Color.BLACK); 
+                                    g2d.draw(new Rectangle(port.x - 3, port.y - 3, 6, 6));
+                                }
+                            }
+                        }
+                    } else {
+                        g2d.setColor(Color.BLACK);
+                        g2d.setStroke(new BasicStroke(1.0f));
+                        g2d.draw(shape);
                     }
-                } else {
-                    // 一般狀態：黑色細線
-                    g2d.setColor(Color.BLACK);
-                    g2d.setStroke(new BasicStroke(1.0f));
-                    g2d.draw(shape);
+                } 
+                else if (obj instanceof CompositeShape) {
+                    // 這是 CompositeShape 的繪製邏輯
+                    CompositeShape group = (CompositeShape) obj;
+                    Rectangle bounds = group.getBounds();
+                    
+                    if (isShapeSelected || isShapeHovered) {
+                        g2d.setColor(Color.BLUE);
+                        g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{5}, 0));
+                    } else {
+                        g2d.setColor(Color.GRAY); // Composite 用灰色表示
+                        g2d.setStroke(new BasicStroke(1.0f));
+                    }
+                    // Requirement: 僅顯示組合物件外框
+                    g2d.draw(bounds);
+                    // 注意：Composite 不畫內部的 Port，只畫框
                 }
             }
 
@@ -367,37 +396,67 @@ public class Main extends JFrame {
                     }
                 } else if (currentMode.equals("select")) {
                     Point p = e.getPoint();
-                    Shape hitShape = findShapeAt(p.x, p.y);
+                    Shape targetShape = null;
 
-                    // 处理 Ctrl/Cmd 多选逻辑 (可选增强)
-                    boolean isCtrlPressed = (e.getModifiersEx() & ActionEvent.CTRL_MASK) != 0;
-
-                    if (hitShape != null) {
-                        // 点击到了对象
-                        if (isCtrlPressed) {
-                            // Ctrl多选：如果已选中则取消，否则加入
-                            if (selectedShapes.contains(hitShape)) {
-                                selectedShapes.remove(hitShape);
-                            } else {
-                                selectedShapes.add(hitShape);
+                    for (int i = shapes.size() - 1; i >= 0; i--) {
+                        Shape shape = shapes.get(i);
+                        // 特別處理：如果是 CompositeShape
+                        if (shape instanceof CompositeShape) {
+                            // 注意：CompositeShape 繼承自 Rectangle，所以可以直接用 contains
+                            if (shape.contains(p.x, p.y)) {
+                                targetShape = shape;
+                                break; // 一旦點中群組，就停止搜尋，不要去理會裡面的子物件
                             }
-                        } else {
-                            // 正常点击：清空之前选择，只选这个
-                            selectedShapes.clear();
-                            selectedShapes.add(hitShape);
                         }
-                        rubberBandStart = null;
-                        rubberBandRect = null;
-                        System.out.println("Object selected");
-                    } else {
-                        // 点击到了空白处
-                        selectedShapes.clear(); // 清空选择
-                        rubberBandStart = p;
-                        rubberBandRect = null;
-                        System.out.println("Start Rubber Band Selection");
                     }
-                    dragging = false;
-                    repaint(); // 状态改变，重绘
+                    
+                    // 2. 如果沒有點中群組，才去檢查一般的子物件
+                    if (targetShape == null) {
+                        for (int i = shapes.size() - 1; i >= 0; i--) {
+                            Shape shape = shapes.get(i);
+                            // 跳過群組（群組已經檢查過了）
+                            if (!(shape instanceof CompositeShape)) {
+                                if (shape.contains(p.x, p.y)) {
+                                    targetShape = shape;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    boolean isCtrlPressed = (e.getModifiersEx() & ActionEvent.CTRL_MASK) != 0; 
+        
+                    // --- 修正選取邏輯 ---
+                    if (targetShape != null) { 
+                        // 點擊到了對象
+                        if (isCtrlPressed) { 
+                            // Ctrl 多選邏輯
+                            if (selectedShapes.contains(targetShape)) {
+                                selectedShapes.remove(targetShape);
+                            } else {
+                                // 關鍵：如果選的是群組，先清空裡面的子物件，只選群組
+                                if (targetShape instanceof CompositeShape) {
+                                    selectedShapes.clear(); // 或者 .removeAll(((CompositeShape) targetShape).getChildren()); 但為了簡單先清空
+                                }
+                                selectedShapes.add(targetShape);
+                            }
+                        } else { 
+                            // 一般點擊：清空之前選擇，只選這個
+                            selectedShapes.clear(); 
+                            selectedShapes.add(targetShape); 
+                        } 
+                        rubberBandStart = null; 
+                        rubberBandRect = null; 
+                        System.out.println("Object selected: " + targetShape.getClass().getSimpleName());
+                    } else { 
+                        // 點擊到了空白處
+                        selectedShapes.clear(); // 清空選擇
+                        rubberBandStart = p; 
+                        rubberBandRect = null; 
+                        System.out.println("Start Rubber Band Selection"); 
+                    } 
+                    dragging = false; 
+                    repaint(); 
                 }
             }
 
@@ -497,17 +556,35 @@ public class Main extends JFrame {
         private Port findPortAt(int x, int y) {
             // 反向遍歷，讓最上層的圖形優先被檢查
             for (Shape shape : shapes) {
-                // 获取该 Shape 对应的 Ports 列表
+                
+                // --- 邏輯 A: 檢查是否為 "群組內的子物件" ---
+                boolean isInsideGroup = false;
+                for (Shape s : shapes) {
+                    if (s instanceof CompositeShape) {
+                        CompositeShape group = (CompositeShape) s;
+                        if (group.getChildren().contains(shape)) {
+                            isInsideGroup = true;
+                            break;
+                        }
+                    }
+                }
+                // 如果是群組內的子物件，跳過，不檢查它的 Port
+                if (isInsideGroup) {
+                    continue;
+                }
+                
+                // --- 邏輯 B: 如果是群組 (CompositeShape) 或 普通物件 ---
+                // 獲取該 Shape 的 Port 列表 (這裡會包含 CompositeShape，因為它也是 Shape)
                 ArrayList<Port> ports = shapePortsMap.get(shape);
                 if (ports != null) {
                     for (Port port : ports) {
                         if (port.contains(x, y)) {
-                            return port; // 找到了，返回该 Port
+                            return port; // 找到了！
                         }
                     }
                 }
             }
-            return null; // 没找到
+            return null;
         }
 
         private Shape findShapeAt(int x, int y) {
@@ -519,15 +596,31 @@ public class Main extends JFrame {
                     return shape;
                 }
             }
+
+            // 再檢查 CompositeShape (如果基本物件沒點到，再看是否點到 Composite 的外框)
+            // 注意：這只是一個簡易實現，實際上 Composite 應該優先於底層物件被選取
+            for (int i = shapes.size() - 1; i >= 0; i--) {
+                Object obj = shapes.get(i);
+                if (obj instanceof CompositeShape) {
+                    CompositeShape group = (CompositeShape) obj;
+                    if (group.contains(x, y)) {
+                        // 這裡我們無法返回 CompositeShape (因為類型是 Shape)，所以這個函數設計有侷限
+                        // 這暗示了你最好將 Shape 和 CompositeShape 都統一為一個介面 (例如：GraphicalNode)
+                        // 但為了讓你先跑起來，我們在 MouseHandler 裡直接重寫邏輯
+                        // 這裡暫時返回 null，我們將在 MouseHandler 的 mousePressed 裡直接寫邏輯
+                    }
+                }
+            }
+
             return null;
         }
 
         private void updateShapePorts(Shape shape) {
             ArrayList<Port> ports = new ArrayList<>();
-            Rectangle bounds = shape.getBounds();
-            
-            // 根据 Shape 类型创建不同数量的 Port
-            if (shape instanceof Rectangle) {
+
+            // 這裡的 logic 會自動適用於 CompositeShape，因為它繼承自 Rectangle
+            if (shape instanceof Rectangle) { 
+                // 這會包含普通的 Rectangle 和 CompositeShape
                 for (int i = 0; i < 8; i++) {
                     ports.add(new Port(shape, i));
                 }
@@ -535,8 +628,88 @@ public class Main extends JFrame {
                 for (int i = 0; i < 4; i++) {
                     ports.add(new Port(shape, i));
                 }
-            }
+            }   
             shapePortsMap.put(shape, ports);
+        }
+
+        public void groupSelected() {
+            // Case D.1: 當有大於 2 (含) 個物件處於被 select 的狀態時。
+            if (selectedShapes.size() >= 2) {
+                // Step 1: 創建群組
+                // 將目前選取的物件列表複製給群組作為子物件
+                java.util.List<Object> tempChildren = new java.util.ArrayList<>(selectedShapes);
+                CompositeShape group = new CompositeShape(tempChildren);
+                
+                // --- Step 2: 關鍵修改 - 不要移除子物件 ---
+                // 原本的代碼會做 shapes.removeAll(selectedShapes)，這會讓子物件消失。
+                // 現在，我們只做一件事：把 "群組框" 加到畫布上。
+                shapes.add(group); // 修正點：只添加群組，不刪除子物件
+                
+                // --- Step 3: 更新選取狀態 ---
+                // 清空原本的選擇（因為它們現在屬於群組了）
+                selectedShapes.clear();
+                // 選取這個新創建的群組框
+                selectedShapes.add(group);
+                
+                // --- Step 4: 確保群組有 Port ---
+                updateShapePorts(group); // 確保群組框有連接點
+                
+                repaint();
+                System.out.println("Grouped " + tempChildren.size() + " objects. Sub-shapes remain on canvas.");
+            }
+            // Alternatives D.1: 當只有 1 個物件被選取時，點擊 Group 選項不會有任何動作。
+        }
+
+        public void ungroupSelected() {
+            // 1. 確保只有一個物件被選取，且該物件是 CompositeShape
+            if (selectedShapes.size() == 1) {
+                Shape selected = selectedShapes.get(0);
+                
+                if (selected instanceof CompositeShape) {
+                    CompositeShape group = (CompositeShape) selected;
+                    
+                    // --- 關鍵新增：刪除與該群組相關的線 ---
+                    // 創建一個臨時列表來存放需要刪除的線
+                    // (不能在遍歷時直接修改原列表，否則會拋出 ConcurrentModificationException)
+                    java.util.List<Line> linesToRemove = new java.util.ArrayList<>();
+                    
+                    // 遍歷畫布上所有的線
+                    for (Line line : lines) {
+                        // 檢查線的起點或終點是否屬於這個群組
+                        // Port 裡有一個 parentShape 屬性可以讓我們追溯
+                        if ((line.start != null && line.start.parentShape == group) ||
+                            (line.end != null && line.end.parentShape == group)) {
+                            linesToRemove.add(line);
+                        }
+                    }
+                    
+                    // 從畫布的 lines 列表中移除這些線
+                    lines.removeAll(linesToRemove);
+                    // --- 關鍵新增結束 ---
+
+                    // 2. 創建一個 List<Shape> 來存放子物件
+                    java.util.List<Shape> validShapes = new java.util.ArrayList<>();
+                    for (Object child : group.getChildren()) {
+                        if (child instanceof Shape) {
+                            validShapes.add((Shape) child);
+                        }
+                    }
+
+                    // 3. 從畫布移除群組
+                    shapes.remove(group); 
+                    
+                    // 4. 加回子物件
+                    shapes.addAll(validShapes); 
+                    
+                    // 5. 更新選取狀態
+                    selectedShapes.clear();
+                    selectedShapes.addAll(validShapes); 
+                    
+                    repaint();
+                    System.out.println("Ungrouped and removed " + linesToRemove.size() + " connected lines.");
+                    return;
+                }
+            }
         }
     }
 
@@ -656,6 +829,10 @@ public class Main extends JFrame {
         JMenuItem groupItem = new JMenuItem("group");
         JMenuItem ungroupItem = new JMenuItem("ungroup");
         JMenuItem labelItem = new JMenuItem("label");
+
+        groupItem.addActionListener(e -> canvasPanel.groupSelected());
+        ungroupItem.addActionListener(e -> canvasPanel.ungroupSelected());
+    
         editMenu.add(groupItem);
         editMenu.add(ungroupItem);
         editMenu.add(labelItem);
@@ -677,5 +854,52 @@ public class Main extends JFrame {
             }
         }
 
+    }
+}
+
+class CompositeShape extends java.awt.Rectangle {
+    // 存放這個群組裡的所有基本物件 (或巢狀群組)
+    private java.util.List<Object> children;
+
+    public CompositeShape(java.util.List<Object> children) {
+        this.children = new java.util.ArrayList<>(children);
+        // 修正：直接計算並設置自己的座標 (因為繼承了 Rectangle)
+        calculateBounds();
+    }
+
+    public java.util.List<Object> getChildren() {
+        return children;
+    }
+
+    // 計算包含所有子物件的最小矩形
+    private void calculateBounds() {
+        if (children.isEmpty()) {
+            setBounds(0, 0, 0, 0); // 直接設置自己 (this)
+            return;
+        }
+        int minX = Integer.MAX_VALUE;
+        int minY = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int maxY = Integer.MIN_VALUE;
+
+        for (Object obj : children) {
+            Rectangle childBounds = null;
+            if (obj instanceof Shape) {
+                // Shape 介面通常有 getBounds()
+                childBounds = ((Shape) obj).getBounds();
+            } else if (obj instanceof CompositeShape) {
+                // CompositeShape 繼承自 Rectangle，所以它自己就是 bounds
+                // 或者你可以強制轉型後調用 getBounds()，但直接轉型為 Rectangle 更簡單
+                childBounds = (Rectangle) obj;
+            }
+            if (childBounds != null) {
+                minX = Math.min(minX, childBounds.x);
+                minY = Math.min(minY, childBounds.y);
+                maxX = Math.max(maxX, childBounds.x + childBounds.width);
+                maxY = Math.max(maxY, childBounds.y + childBounds.height);
+            }
+        }
+        // 修正：直接設置當前對象 (this) 的大小
+        setBounds(minX, minY, maxX - minX, maxY - minY);
     }
 }
