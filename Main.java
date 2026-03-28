@@ -11,7 +11,7 @@ public class Main extends JFrame {
         public Object parentShape; // 可選：如果需要知道這個 Port 屬於哪個圖形
         public int type;
 
-        public Port(Shape parentShape, int type) {
+        public Port(Object parentShape, int type) {
             this.parentShape = parentShape;
             this.type = type;
             updatePosition();
@@ -69,7 +69,7 @@ public class Main extends JFrame {
                     default:
                         x = cx; y = cy; // 防呆
                 }
-            } else if (parentShape instanceof Ellipse2D) {
+            } else if (parentShape instanceof MutableOval) {
                 MutableOval oval = (MutableOval) parentShape;
 
                 int cx = oval.x + oval.width / 2;
@@ -713,19 +713,13 @@ public class Main extends JFrame {
             
             if (obj instanceof Rectangle) {
                 for (int i = 0; i < 8; i++) {
-                    ports.add(new Port((Shape) obj, i));
+                    ports.add(new Port(obj, i));
                 }
             } else if (obj instanceof MutableOval) {
-                MutableOval oval = (MutableOval) obj;
-                int cx = oval.x + oval.width / 2;
-                int cy = oval.y + oval.height / 2;
                 
-                Port p0 = new Port(null, 0); p0.x = cx; p0.y = oval.y;
-                Port p1 = new Port(null, 1); p1.x = oval.x + oval.width; p1.y = cy;
-                Port p2 = new Port(null, 2); p2.x = cx; p2.y = oval.y + oval.height;
-                Port p3 = new Port(null, 3); p3.x = oval.x; p3.y = cy;
-                
-                ports.add(p0); ports.add(p1); ports.add(p2); ports.add(p3);
+                for (int i = 0; i < 4; i++) {
+                    ports.add(new Port(obj, i)); // ⭐ 核心
+                }
                 
                 // 把這行移進來，確保 Oval 的資料被儲存
                 shapePortsMap.put(obj, ports); 
