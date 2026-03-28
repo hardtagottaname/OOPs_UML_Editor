@@ -136,6 +136,12 @@ public class Main extends JFrame {
     }
 
     private class CanvasPanel extends JPanel {
+        private java.util.List<Shape> selectedShapes = new java.util.ArrayList<>(); // 新的多选列表
+        private Shape hoverShape = null; // 新增：记录当前鼠标悬停的对象
+        private boolean dragging = false;
+        private Point rubberBandStart = null; // 框選起點
+        private Rectangle rubberBandRect = null; // 框選矩形 (暫存)
+
         private ArrayList<Shape> shapes;
         private ArrayList<Line> lines;
 
@@ -174,7 +180,49 @@ public class Main extends JFrame {
             g2d.setColor(Color.BLACK);
             
             for (Shape shape : shapes) {
-                g2d.draw(shape);
+                // 判斷是否為選取狀態
+                boolean isShapeHovered = (hoverShape == shape);
+                boolean isShapeSelected = selectedShapes.contains(shape);
+                
+                if (isShapeSelected || isShapeHovered) {
+                    // 1. 畫選取框 (例如：粗輪廓或虛線框)
+                    g2d.setColor(Color.BLUE);
+                    g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{5}, 0));
+                    g2d.draw(shape);
+                    
+                    // 2. Case C 定義：顯示所有 Ports
+                    // 從 map 中獲取該 shape 的 ports 並畫出來
+                    ArrayList<Port> ports = shapePortsMap.get(shape);
+                    if (ports != null) {
+                        for (Port port : ports) {
+                            // 畫一個小方塊代表 Port
+                            g2d.setColor(Color.WHITE);
+                            g2d.fill(new Rectangle(port.x - 3, port.y - 3, 6, 6));
+                            g2d.setColor(Color.BLACK);
+                            g2d.draw(new Rectangle(port.x - 3, port.y - 3, 6, 6));
+                        }
+                    }
+                } else {
+                    // 一般狀態：黑色細線
+                    g2d.setColor(Color.BLACK);
+                    g2d.setStroke(new BasicStroke(1.0f));
+                    g2d.draw(shape);
+                }
+            }
+
+            if (currentMode.equals("select") && rubberBandRect != null) {
+                // 設定虛線樣式
+                float[] dash = {5.0f};
+                g2d.setStroke(new BasicStroke(1.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, dash, 0.0f));
+                g2d.setColor(Color.BLUE);
+                
+                // 畫矩形 (注意：rubberBandRect 可能是 null，所以要判斷)
+                g2d.draw(rubberBandRect);
+                
+                // (可選) 畫一個半透明的背景
+                // AlphaComposite alpha = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.1f);
+                // g2d.setComposite(alpha);
+                // g2d.fill(rubberBandRect);
             }
 
             for (Line line : lines) {
@@ -317,19 +365,66 @@ public class Main extends JFrame {
                         tempStartPort = port;
                         System.out.println("Start port set at: (" + port.x + ", " + port.y + ")");
                     }
+                } else if (currentMode.equals("select")) {
+                    Point p = e.getPoint();
+                    Shape hitShape = findShapeAt(p.x, p.y);
+
+                    // 处理 Ctrl/Cmd 多选逻辑 (可选增强)
+                    boolean isCtrlPressed = (e.getModifiersEx() & ActionEvent.CTRL_MASK) != 0;
+
+                    if (hitShape != null) {
+                        // 点击到了对象
+                        if (isCtrlPressed) {
+                            // Ctrl多选：如果已选中则取消，否则加入
+                            if (selectedShapes.contains(hitShape)) {
+                                selectedShapes.remove(hitShape);
+                            } else {
+                                selectedShapes.add(hitShape);
+                            }
+                        } else {
+                            // 正常点击：清空之前选择，只选这个
+                            selectedShapes.clear();
+                            selectedShapes.add(hitShape);
+                        }
+                        rubberBandStart = null;
+                        rubberBandRect = null;
+                        System.out.println("Object selected");
+                    } else {
+                        // 点击到了空白处
+                        selectedShapes.clear(); // 清空选择
+                        rubberBandStart = p;
+                        rubberBandRect = null;
+                        System.out.println("Start Rubber Band Selection");
+                    }
+                    dragging = false;
+                    repaint(); // 状态改变，重绘
                 }
             }
 
             @Override
             public void mouseDragged(MouseEvent e) {
+                dragging = true; // 開始拖曳
+
                 if (tempStartPort != null) {
+                    // 這是原本的畫線邏輯
                     tempLineEnd = e.getPoint();
                     repaint();
+                } else if (currentMode.equals("select") && rubberBandStart != null) {
+                    Point start = rubberBandStart;
+                    Point current = e.getPoint();
+                    int x = Math.min(start.x, current.x);
+                    int y = Math.min(start.y, current.y);
+                    int width = Math.abs(start.x - current.x);
+                    int height = Math.abs(start.y - current.y);
+                    rubberBandRect = new Rectangle(x, y, width, height);
+                    repaint(); // 实时绘制框选矩形
                 }
             }
 
             @Override
             public void mouseReleased(MouseEvent e) {
+                dragging = false;
+
                 if (tempStartPort != null) {
                     Port endPort = findPortAt(e.getX(), e.getY());
                     
@@ -345,6 +440,56 @@ public class Main extends JFrame {
                     tempStartPort = null;
                     tempLineEnd = null;
                     repaint();
+                } else if (currentMode.equals("select") && rubberBandStart != null) {
+                    // 處理框選結束
+                    // 此時 rubberBandRect 就是 (x1, y1, x2, y2) 形成的矩形
+                    // 需要檢查所有 shapes 是否「完全」落在這個矩形內
+                    Rectangle finalRect = rubberBandRect;
+                    
+                    // 只有当框选范围足够大时才进行选择
+                    if (finalRect != null && finalRect.width > 5 && finalRect.height > 5) {
+                        // 关键修改：遍历所有图形，将范围内所有图形加入 selectedShapes
+                        for (Shape shape : shapes) {
+                            // 判断图形中心点或边界是否在框选矩形内
+                            // 这里使用 intersects 表示只要图形和框有重叠就算选中
+                            // 如果需要完全包含，使用 finalRect.contains(shape.getBounds())
+                            if (finalRect.intersects(shape.getBounds())) {
+                                // 防止重复添加
+                                if (!selectedShapes.contains(shape)) {
+                                    selectedShapes.add(shape);
+                                }
+                            }
+                        }
+                    } else {
+                        // 矩形太小，视为取消选择
+                        selectedShapes.clear();
+                    }
+                    
+                    rubberBandStart = null;
+                    rubberBandRect = null;
+                    repaint(); // 更新选择状态的视觉效果
+                    System.out.println("Selected " + selectedShapes.size() + " objects");
+                }
+            }
+
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                if (!currentMode.equals("select")) {
+                    return;
+                }
+                Point p = e.getPoint();
+                Shape hitShape = findShapeAt(p.x, p.y);
+                
+                // 更新悬停状态
+                if (hoverShape != hitShape) { // 只有当悬停对象改变时才更新
+                    hoverShape = hitShape;
+                    repaint(); // 必须重绘，否则 paintComponent 不知道要画 Ports
+                }
+
+                if (hitShape != null) {
+                    canvasPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                } else {
+                    canvasPanel.setCursor(Cursor.getDefaultCursor());
                 }
             }
         }
@@ -363,6 +508,18 @@ public class Main extends JFrame {
                 }
             }
             return null; // 没找到
+        }
+
+        private Shape findShapeAt(int x, int y) {
+            // 需求：深度值小的在上層 -> 後加入的通常深度值小 (或者我們遍歷時從最後一個開始)
+            // 你的代碼已經是倒序，這符合需求 (Alternative C.1: 最上層先接收事件)
+            for (int i = shapes.size() - 1; i >= 0; i--) {
+                Shape shape = shapes.get(i);
+                if (shape.contains(x, y)) {
+                    return shape;
+                }
+            }
+            return null;
         }
 
         private void updateShapePorts(Shape shape) {
