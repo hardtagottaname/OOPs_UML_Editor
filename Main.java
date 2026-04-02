@@ -171,6 +171,12 @@ public class Main extends JFrame {
 
         @Override
         protected void paintComponent(Graphics g) {
+            for (ArrayList<Port> ports : shapePortsMap.values()) {
+                for (Port p : ports) {
+                    p.updatePosition();
+                }
+            }
+
             super.paintComponent(g);
             Graphics2D g2d = (Graphics2D) g;
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -709,25 +715,29 @@ public class Main extends JFrame {
         }
 
         private void updateShapePorts(Object obj) {
-            ArrayList<Port> ports = new ArrayList<>();
-            
-            if (obj instanceof Rectangle) {
-                for (int i = 0; i < 8; i++) {
-                    ports.add(new Port(obj, i));
+            ArrayList<Port> ports = shapePortsMap.get(obj);
+
+            // ✅ 如果還沒有，才建立
+            if (ports == null) {
+                ports = new ArrayList<>();
+
+                if (obj instanceof Rectangle) {
+                    for (int i = 0; i < 8; i++) {
+                        ports.add(new Port(obj, i));
+                    }
+                } else if (obj instanceof MutableOval) {
+                    for (int i = 0; i < 4; i++) {
+                        ports.add(new Port(obj, i));
+                    }
                 }
-            } else if (obj instanceof MutableOval) {
-                
-                for (int i = 0; i < 4; i++) {
-                    ports.add(new Port(obj, i)); // ⭐ 核心
+
+                shapePortsMap.put(obj, ports);
+            } else {
+                // ✅ 已存在 → 只更新位置
+                for (Port p : ports) {
+                    p.updatePosition();
                 }
-                
-                // 把這行移進來，確保 Oval 的資料被儲存
-                shapePortsMap.put(obj, ports); 
-                return; // 記得 return，否則下面會重複 put
             }
-            
-            // 如果是 Rectangle 或其他，執行這行
-            shapePortsMap.put(obj, ports);
         }
 
         public void groupSelected() {
