@@ -144,6 +144,9 @@ public class Main extends JFrame {
         private Port tempStartPort = null;      
         private Point tempLineEnd = null; 
 
+        private Port resizingPort = null;
+        private Object resizingShape = null;
+
         private Point lastMousePoint = new Point(0, 0); 
         
         public CanvasPanel() {
@@ -424,6 +427,18 @@ public class Main extends JFrame {
                 } else if (currentMode.equals("select")) {
                     Point p = e.getPoint();
                     Object targetShape = findShapeAt(p.x, p.y);
+                    Port port = findPortAt(e.getX(), e.getY());
+
+                    if (port != null) {
+                        // ❗ Alternative F.1：不能 resize group
+                        if (port.parentShape instanceof CompositeShape) {
+                            return;
+                        }
+
+                        resizingPort = port;
+                        resizingShape = port.parentShape;
+                        return;
+                    }
                     
                     // 2. 如果沒有點中群組，才去檢查一般的子物件
                     if (targetShape == null) {
@@ -488,6 +503,12 @@ public class Main extends JFrame {
             public void mouseDragged(MouseEvent e) {
                 Point currentPoint = e.getPoint();
 
+                if (resizingPort != null && resizingShape != null) {
+                    resizeShape(resizingShape, resizingPort, e.getX(), e.getY());
+                    repaint();
+                    return;
+                }
+                
                 if (tempStartPort != null) {
                     // 画线模式（保持不变）
                     tempLineEnd = currentPoint;
@@ -546,6 +567,8 @@ public class Main extends JFrame {
 
             @Override
             public void mouseReleased(MouseEvent e) {
+                resizingPort = null;
+                resizingShape = null;
                 dragging = false;
 
                 if (tempStartPort != null) {
@@ -658,6 +681,113 @@ public class Main extends JFrame {
                 // --- 3. 更新群組框的 Port ---
                 updateShapePorts(group);
                 repaint();
+            }
+
+
+            private void resizeShape(Object shape, Port port, int mx, int my) {
+                int minSize = 30;
+
+                if (shape instanceof Rectangle) {
+                    Rectangle rect = (Rectangle) shape;
+
+                    int x = rect.x;
+                    int y = rect.y;
+                    int w = rect.width;
+                    int h = rect.height;
+
+                    int right = x + w;
+                    int bottom = y + h;
+
+                    switch (port.type) {
+                        case 0: // TL
+                            x = mx;
+                            y = my;
+                            w = right - x;
+                            h = bottom - y;
+                            break;
+
+                        case 2: // TR
+                            y = my;
+                            w = mx - x;
+                            h = bottom - y;
+                            break;
+
+                        case 4: // BR
+                            w = mx - x;
+                            h = my - y;
+                            break;
+
+                        case 6: // BL
+                            x = mx;
+                            w = right - x;
+                            h = my - y;
+                            break;
+                        case 1: // T
+                            y = my;
+                            h = bottom - y;
+                            break;
+                        case 3: // R
+                            w = mx - x;
+                            break;
+                        case 5: // B
+                            h = my - y;
+                            break;  
+                        case 7: // L
+                            x = mx;
+                            w = right - x;
+                            break;
+                    }
+
+                    if (w < 0) {
+                        x = x + w;
+                        w = -w;
+                    }
+                    if (h < 0) {
+                        y = y + h;
+                        h = -h;
+                    }
+
+                    if (w < minSize) w = minSize;
+                    if (h < minSize) h = minSize;
+
+                    rect.x = x;
+                    rect.y = y;
+                    rect.width = w;
+                    rect.height = h;
+
+                    updateShapePorts(rect);
+                }
+
+                else if (shape instanceof MutableOval) {
+                    MutableOval oval = (MutableOval) shape;
+
+                    int x1 = oval.x;
+                    int y1 = oval.y;
+                    int x2 = oval.x + oval.width;
+                    int y2 = oval.y + oval.height;
+
+                    switch (port.type) {
+                        case 0: y1 = my; break; // 上
+                        case 1: x2 = mx; break; // 右
+                        case 2: y2 = my; break; // 下
+                        case 3: x1 = mx; break; // 左
+                    }
+
+                    int newX = Math.min(x1, x2);
+                    int newY = Math.min(y1, y2);
+                    int newW = Math.abs(x2 - x1);
+                    int newH = Math.abs(y2 - y1);
+
+                    newW = Math.max(newW, minSize);
+                    newH = Math.max(newH, minSize);
+
+                    oval.x = newX;
+                    oval.y = newY;
+                    oval.width = newW;
+                    oval.height = newH;
+
+                    updateShapePorts(oval);
+                }
             }
         }
 
