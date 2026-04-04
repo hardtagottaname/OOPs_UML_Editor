@@ -1,9 +1,13 @@
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.awt.event.*;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Ellipse2D;
 import java.util.List;
+import java.util.Map;
 
 public class Main extends JFrame {
     public static class Port {
@@ -131,6 +135,49 @@ public class Main extends JFrame {
         add(canvasPanel, BorderLayout.CENTER);
     }
 
+    private void showLabelDialog() {
+        if (canvasPanel.selectedShapes.size() != 1) {
+            JOptionPane.showMessageDialog(this, "Please select one object.");
+            return;
+        }
+
+        Object shape = canvasPanel.selectedShapes.get(0);
+
+        String currentName = canvasPanel.shapeLabels.get(shape);
+        Color currentColor = canvasPanel.shapeLabelColors.get(shape);
+
+        JTextField nameField = new JTextField(currentName);
+
+        JButton colorButton = new JButton("Choose Color");
+        final Color[] selectedColor = {currentColor};
+
+        colorButton.addActionListener(e -> {
+            Color c = JColorChooser.showDialog(this, "Pick Color", currentColor);
+            if (c != null) {
+                selectedColor[0] = c;
+            }
+        });
+
+        JPanel panel = new JPanel(new GridLayout(2, 2));
+        panel.add(new JLabel("Label Name:"));
+        panel.add(nameField);
+        panel.add(new JLabel("Label Color:"));
+        panel.add(colorButton);
+
+        int result = JOptionPane.showConfirmDialog(
+            this,
+            panel,
+            "Customize Label Style",
+            JOptionPane.OK_CANCEL_OPTION
+        );
+
+        if (result == JOptionPane.OK_OPTION) {
+            canvasPanel.shapeLabels.put(shape, nameField.getText());
+            canvasPanel.shapeLabelColors.put(shape, selectedColor[0]);
+            canvasPanel.repaint();
+        }
+    }
+
     private class CanvasPanel extends JPanel {
         private java.util.List<Object> selectedShapes = new java.util.ArrayList<>();// 新的多选列表
         private Object hoverShape = null; // 新增：记录当前鼠标悬停的对象
@@ -147,12 +194,18 @@ public class Main extends JFrame {
         private Port resizingPort = null;
         private Object resizingShape = null;
 
+        private Map<Object, String> shapeLabels = new IdentityHashMap<>();
+        private Map<Object, Color> shapeLabelColors = new IdentityHashMap<>();
+        private Map<Object, Boolean> shapeLabelFlipX = new IdentityHashMap<>();
+        private Map<Object, Boolean> shapeLabelFlipY = new IdentityHashMap<>();
+
         private Point lastMousePoint = new Point(0, 0); 
         
         public CanvasPanel() {
             shapes = new ArrayList<>();
             lines = new ArrayList<>();
-            shapePortsMap = new java.util.HashMap<>();
+            // 使用 IdentityHashMap 以便在 Rectangle 等可變 Key 被調整後仍能正確查找
+            shapePortsMap = new java.util.IdentityHashMap<>();
 
             MouseHandler mouseHandler = new MouseHandler();
             addMouseListener(mouseHandler);
@@ -163,6 +216,12 @@ public class Main extends JFrame {
 
         public void addShape(Object obj) {
             shapes.add(obj);
+
+            shapeLabels.put(obj, "Default"); // 預設名稱
+            shapeLabelColors.put(obj, Color.YELLOW); // 預設背景
+            shapeLabelFlipX.put(obj, false); // 預設不翻轉
+            shapeLabelFlipY.put(obj, false); // 預設不翻轉
+            
             updateShapePorts(obj); // 這裡會呼叫下方重載的 updateShapePorts
             repaint();
         }
@@ -170,6 +229,65 @@ public class Main extends JFrame {
         public void addLine(Line line) {
             lines.add(line);
             repaint();
+        }
+
+        private void drawLabel(Graphics2D g2d, Object obj) {
+            String label = shapeLabels.get(obj);
+            Color labelColor = shapeLabelColors.get(obj);
+            Boolean flipX = shapeLabelFlipX.get(obj);
+            Boolean flipY = shapeLabelFlipY.get(obj);
+
+            if (label != null && labelColor != null) {
+                Rectangle bounds;
+
+                if (obj instanceof Shape) {
+                    bounds = ((Shape) obj).getBounds();
+                } else {
+                    bounds = ((MutableOval) obj).getBounds();
+                }
+
+                int lx = bounds.x + bounds.width / 2;
+                int ly = bounds.y + bounds.height / 2;
+
+                FontMetrics fm = g2d.getFontMetrics();
+                int textWidth = fm.stringWidth(label);
+                int textHeight = fm.getHeight();
+
+                int padding = 4;
+
+                // 儲存原始狀態
+                AffineTransform originalTransform = g2d.getTransform();
+
+                // 應用翻轉
+                g2d.translate(lx, ly);
+                if (flipX != null && flipX) {
+                    g2d.scale(-1, 1);
+                }
+                if (flipY != null && flipY) {
+                    g2d.scale(1, -1);
+                }
+                g2d.translate(-lx, -ly);
+
+                // 背景
+                g2d.setColor(labelColor);
+                g2d.fillRect(
+                    lx - textWidth / 2 - padding,
+                    ly - textHeight / 2,
+                    textWidth + padding * 2,
+                    textHeight
+                );
+
+                // 文字
+                g2d.setColor(Color.BLACK);
+                g2d.drawString(
+                    label,
+                    lx - textWidth / 2,
+                    ly + fm.getAscent() / 2
+                );
+
+                // 恢復原始狀態
+                g2d.setTransform(originalTransform);
+            }
         }
 
         @Override
@@ -212,6 +330,8 @@ public class Main extends JFrame {
                         g2d.setStroke(new BasicStroke(1.0f));
                         g2d.draw(shape);
                     }
+
+                    drawLabel(g2d, obj);
                 } 
                 // --- 新增：處理 MutableOval 的繪製 ---
                 else if (obj instanceof MutableOval) {
@@ -241,6 +361,8 @@ public class Main extends JFrame {
                             }
                         }
                     }
+
+                    drawLabel(g2d, obj);
                 } else if (obj instanceof CompositeShape) {
                     CompositeShape cs = (CompositeShape) obj;
 
@@ -275,6 +397,7 @@ public class Main extends JFrame {
                     g2d.draw(cs.getBounds());
                 }
             }
+
 
             // --- 修正：框選邏輯 (Rubber Band) ---
             // 這部分通常不需要改，但為了安全檢查一下
@@ -690,70 +813,75 @@ public class Main extends JFrame {
                 if (shape instanceof Rectangle) {
                     Rectangle rect = (Rectangle) shape;
 
-                    int x = rect.x;
-                    int y = rect.y;
-                    int w = rect.width;
-                    int h = rect.height;
+                    int x1 = rect.x;
+                    int y1 = rect.y;
+                    int x2 = rect.x + rect.width;
+                    int y2 = rect.y + rect.height;
 
-                    int right = x + w;
-                    int bottom = y + h;
+                    int newLeft = x1;
+                    int newTop = y1;
+                    int newRight = x2;
+                    int newBottom = y2;
 
                     switch (port.type) {
                         case 0: // TL
-                            x = mx;
-                            y = my;
-                            w = right - x;
-                            h = bottom - y;
-                            break;
-
-                        case 2: // TR
-                            y = my;
-                            w = mx - x;
-                            h = bottom - y;
-                            break;
-
-                        case 4: // BR
-                            w = mx - x;
-                            h = my - y;
-                            break;
-
-                        case 6: // BL
-                            x = mx;
-                            w = right - x;
-                            h = my - y;
+                            newLeft = mx;
+                            newTop = my;
                             break;
                         case 1: // T
-                            y = my;
-                            h = bottom - y;
+                            newTop = my;
+                            break;
+                        case 2: // TR
+                            newTop = my;
+                            newRight = mx;
                             break;
                         case 3: // R
-                            w = mx - x;
+                            newRight = mx;
+                            break;
+                        case 4: // BR
+                            newRight = mx;
+                            newBottom = my;
                             break;
                         case 5: // B
-                            h = my - y;
-                            break;  
+                            newBottom = my;
+                            break;
+                        case 6: // BL
+                            newLeft = mx;
+                            newBottom = my;
+                            break;
                         case 7: // L
-                            x = mx;
-                            w = right - x;
+                            newLeft = mx;
                             break;
                     }
 
-                    if (w < 0) {
-                        x = x + w;
-                        w = -w;
+                    boolean flipX = newRight < newLeft;
+                    boolean flipY = newBottom < newTop;
+
+                    if (flipX) {
+                        int temp = newLeft;
+                        newLeft = newRight;
+                        newRight = temp;
+                        shapeLabelFlipX.put(shape, !shapeLabelFlipX.get(shape));
                     }
-                    if (h < 0) {
-                        y = y + h;
-                        h = -h;
+                    if (flipY) {
+                        int temp = newTop;
+                        newTop = newBottom;
+                        newBottom = temp;
+                        shapeLabelFlipY.put(shape, !shapeLabelFlipY.get(shape));
                     }
 
-                    if (w < minSize) w = minSize;
-                    if (h < minSize) h = minSize;
+                    int newX = Math.min(newLeft, newRight);
+                    int newY = Math.min(newTop, newBottom);
+                    int newW = Math.abs(newRight - newLeft);
+                    int newH = Math.abs(newBottom - newTop);
 
-                    rect.x = x;
-                    rect.y = y;
-                    rect.width = w;
-                    rect.height = h;
+                    if (newW < minSize) newW = minSize;
+                    if (newH < minSize) newH = minSize;
+
+                    rect.x = newX;
+                    rect.y = newY;
+                    rect.width = newW;
+                    rect.height = newH;
 
                     updateShapePorts(rect);
                 }
@@ -766,20 +894,49 @@ public class Main extends JFrame {
                     int x2 = oval.x + oval.width;
                     int y2 = oval.y + oval.height;
 
+                    int newLeft = x1;
+                    int newTop = y1;
+                    int newRight = x2;
+                    int newBottom = y2;
+
                     switch (port.type) {
-                        case 0: y1 = my; break; // 上
-                        case 1: x2 = mx; break; // 右
-                        case 2: y2 = my; break; // 下
-                        case 3: x1 = mx; break; // 左
+                        case 0: // Top
+                            newTop = my;
+                            break;
+                        case 1: // Right
+                            newRight = mx;
+                            break;
+                        case 2: // Bottom
+                            newBottom = my;
+                            break;
+                        case 3: // Left
+                            newLeft = mx;
+                            break;
                     }
 
-                    int newX = Math.min(x1, x2);
-                    int newY = Math.min(y1, y2);
-                    int newW = Math.abs(x2 - x1);
-                    int newH = Math.abs(y2 - y1);
+                    boolean flipX = newRight < newLeft;
+                    boolean flipY = newBottom < newTop;
 
-                    newW = Math.max(newW, minSize);
-                    newH = Math.max(newH, minSize);
+                    if (flipX) {
+                        int temp = newLeft;
+                        newLeft = newRight;
+                        newRight = temp;
+                        shapeLabelFlipX.put(shape, !shapeLabelFlipX.get(shape));
+                    }
+                    if (flipY) {
+                        int temp = newTop;
+                        newTop = newBottom;
+                        newBottom = temp;
+                        shapeLabelFlipY.put(shape, !shapeLabelFlipY.get(shape));
+                    }
+
+                    int newX = Math.min(newLeft, newRight);
+                    int newY = Math.min(newTop, newBottom);
+                    int newW = Math.abs(newRight - newLeft);
+                    int newH = Math.abs(newBottom - newTop);
+
+                    if (newW < minSize) newW = minSize;
+                    if (newH < minSize) newH = minSize;
 
                     oval.x = newX;
                     oval.y = newY;
@@ -790,6 +947,8 @@ public class Main extends JFrame {
                 }
             }
         }
+
+        
 
         private Port findPortAt(int x, int y) {
             // 反向遍歷，讓最上層的圖形優先被檢查
@@ -806,6 +965,64 @@ public class Main extends JFrame {
             }
             return null;
         }
+
+        // private Port getPortByType(Object shape, int type) {
+        //     ArrayList<Port> ports = shapePortsMap.get(shape);
+        //     if (ports == null) return null;
+        //     for (Port port : ports) {
+        //         if (port.type == type) {
+        //             return port;
+        //         }
+        //     }
+        //     return null;
+        // }
+
+        // private int getFlippedPortType(int originalType, boolean flipX, boolean flipY, boolean isRectangle) {
+        //     if (isRectangle) {
+        //         if (originalType == 1 || originalType == 5) {
+        //             if (flipY) return (originalType == 1) ? 5 : 1;
+        //             return originalType;
+        //         }
+        //         if (originalType == 3 || originalType == 7) {
+        //             if (flipX) return (originalType == 3) ? 7 : 3;
+        //             return originalType;
+        //         }
+        //         if (originalType == 0) {
+        //             if (flipX && flipY) return 4;
+        //             if (flipX) return 2;
+        //             if (flipY) return 6;
+        //             return 0;
+        //         }
+        //         if (originalType == 2) {
+        //             if (flipX && flipY) return 6;
+        //             if (flipX) return 4;
+        //             if (flipY) return 0;
+        //             return 2;
+        //         }
+        //         if (originalType == 4) {
+        //             if (flipX && flipY) return 0;
+        //             if (flipX) return 6;
+        //             if (flipY) return 2;
+        //             return 4;
+        //         }
+        //         if (originalType == 6) {
+        //             if (flipX && flipY) return 2;
+        //             if (flipX) return 0;
+        //             if (flipY) return 4;
+        //             return 6;
+        //         }
+        //     } else {
+        //         if (originalType == 0 || originalType == 2) {
+        //             if (flipY) return (originalType == 0) ? 2 : 0;
+        //             return originalType;
+        //         }
+        //         if (originalType == 1 || originalType == 3) {
+        //             if (flipX) return (originalType == 1) ? 3 : 1;
+        //             return originalType;
+        //         }
+        //     }
+        //     return originalType;
+        // }
 
         private Object findShapeAt(int x, int y) {
             // ⭐ Step 1：先找「最上層的 group」（由上往下）
@@ -1058,7 +1275,8 @@ public class Main extends JFrame {
 
         groupItem.addActionListener(e -> canvasPanel.groupSelected());
         ungroupItem.addActionListener(e -> canvasPanel.ungroupSelected());
-    
+        labelItem.addActionListener(e -> showLabelDialog());
+
         editMenu.add(groupItem);
         editMenu.add(ungroupItem);
         editMenu.add(labelItem);
