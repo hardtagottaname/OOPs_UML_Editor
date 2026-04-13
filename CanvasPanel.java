@@ -6,25 +6,21 @@ import java.awt.geom.Ellipse2D;
 import java.util.*;
 import java.util.List;
 
-/**
- * CanvasPanel類別：負責繪圖和處理用戶互動的畫布面板
- * 管理形狀、線條、選擇狀態和各種繪圖操作
- */
 public class CanvasPanel extends JPanel {
-    // 形狀和線條列表
-    private List<Object> shapes; // 儲存所有形狀（Rectangle, MutableOval, CompositeShape）
-    private List<Line> lines; // 儲存所有線條
+    // 所有線條和 Object 都在這兩個 list 裡面
+    private List<Object> shapes;
+    private List<Line> lines; 
 
-    // 選擇和互動狀態
-    private List<Object> selectedShapes = new ArrayList<>(); // 多選列表
-    private Object hoverShape = null; // 當前滑鼠懸停的形狀
+    // 選擇 (Object List) 或懸浮 (Object)
+    private List<Object> selectedShapes = new ArrayList<>(); 
+    private Object hoverShape = null; 
 
     // 繪圖相關
     private boolean dragging = false;
     private Point rubberBandStart = null; // 框選起點
     private Rectangle rubberBandRect = null; // 框選矩形
 
-    // 線條繪製相關
+    // Line 繪製相關
     private Port tempStartPort = null;
     private Point tempLineEnd = null;
 
@@ -38,15 +34,13 @@ public class CanvasPanel extends JPanel {
     private Map<Object, Boolean> shapeLabelFlipX = new IdentityHashMap<>();
     private Map<Object, Boolean> shapeLabelFlipY = new IdentityHashMap<>();
 
-    // Port映射
+    // port 相關
     private Map<Object, ArrayList<Port>> shapePortsMap;
 
     // 滑鼠位置追蹤
     private Point lastMousePoint = new Point(0, 0);
 
-    /**
-     * 建構子：初始化CanvasPanel
-     */
+    //constructor
     public CanvasPanel() {
         shapes = new ArrayList<>();
         lines = new ArrayList<>();
