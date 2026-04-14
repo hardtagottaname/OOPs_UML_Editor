@@ -28,7 +28,7 @@ public class CanvasPanel extends JPanel {
     private Port resizingPort = null;
     private Object resizingShape = null;
 
-    // 標籤相關
+    // 標籤相關 (比記憶體位置是否相同)
     private Map<Object, String> shapeLabels = new IdentityHashMap<>();
     private Map<Object, Color> shapeLabelColors = new IdentityHashMap<>();
     private Map<Object, Boolean> shapeLabelFlipX = new IdentityHashMap<>();
@@ -40,6 +40,9 @@ public class CanvasPanel extends JPanel {
     // 滑鼠位置追蹤
     private Point lastMousePoint = new Point(0, 0);
 
+    // 將目前的 mode 設為 select    
+    private String currentMode = "select";
+
     //constructor
     public CanvasPanel() {
         shapes = new ArrayList<>();
@@ -47,49 +50,43 @@ public class CanvasPanel extends JPanel {
         shapePortsMap = new IdentityHashMap<>();
 
         // 設定滑鼠事件監聽器
-        MouseHandler mouseHandler = new MouseHandler();
-        addMouseListener(mouseHandler);
-        addMouseMotionListener(mouseHandler);
-        setFocusable(true);
-        setRequestFocusEnabled(true);
+        MouseHandler mouseHandler = new MouseHandler(); // 負責處理滑鼠的按下、拖曳、放開、移動等等事件
+        addMouseListener(mouseHandler); // 讓 CcanvasPanel 監聽滑鼠的按下、放開、點擊、進入、離開等等事件
+        addMouseMotionListener(mouseHandler); // 讓 CanvasPanel 監聽滑鼠的郭義和移動等等事件
+        
+        // 設定可成為鍵盤事件焦點
+        setFocusable(true); // 允許成為鍵盤焦點
+        setRequestFocusEnabled(true); // 允許請求鍵盤焦點
     }
 
-    /**
-     * 添加形狀到畫布
-     * @param obj 要添加的形狀物件
-     */
+    // 新建一個 rect 或 oval
     public void addShape(Object obj) {
         shapes.add(obj);
 
-        // 設定預設標籤
-        shapeLabels.put(obj, "Default");
-        shapeLabelColors.put(obj, Color.YELLOW);
-        shapeLabelFlipX.put(obj, false);
-        shapeLabelFlipY.put(obj, false);
+        // label 預設空字串，顏色與背景一樣
+        shapeLabels.put(obj, "");
+        shapeLabelColors.put(obj, Color.LIGHT_GRAY);
+        
+        // 標籤翻轉
+        // shapeLabelFlipX.put(obj, false);
+        // shapeLabelFlipY.put(obj, false);
 
-        updateShapePorts(obj);
-        repaint();
+        updateShapePorts(obj); // 將新增的物件建立 ports
+        repaint(); // 充新繪製圖形
     }
 
-    /**
-     * 添加線條到畫布
-     * @param line 要添加的線條
-     */
+    // 將建立好的 line 新增進去 lines list
     public void addLine(Line line) {
         lines.add(line);
         repaint();
     }
 
-    /**
-     * 繪製形狀標籤
-     * @param g2d 圖形上下文
-     * @param obj 形狀物件
-     */
+    // 繪製 label
     private void drawLabel(Graphics2D g2d, Object obj) {
         String label = shapeLabels.get(obj);
         Color labelColor = shapeLabelColors.get(obj);
-        Boolean flipX = shapeLabelFlipX.get(obj);
-        Boolean flipY = shapeLabelFlipY.get(obj);
+        // Boolean flipX = shapeLabelFlipX.get(obj);
+        // Boolean flipY = shapeLabelFlipY.get(obj);
 
         if (label != null && labelColor != null) {
             Rectangle bounds = getShapeBounds(obj);
@@ -97,51 +94,48 @@ public class CanvasPanel extends JPanel {
             int lx = bounds.x + bounds.width / 2;
             int ly = bounds.y + bounds.height / 2;
 
-            FontMetrics fm = g2d.getFontMetrics();
+            // 管理字串的高及寬及 padding
+            FontMetrics fm = g2d.getFontMetrics(); 
             int textWidth = fm.stringWidth(label);
             int textHeight = fm.getHeight();
             int padding = 4;
 
             // 儲存原始變換狀態
-            AffineTransform originalTransform = g2d.getTransform();
+            // AffineTransform originalTransform = g2d.getTransform();
 
             // 應用翻轉
-            g2d.translate(lx, ly);
-            if (flipX != null && flipX) {
-                g2d.scale(-1, 1);
-            }
-            if (flipY != null && flipY) {
-                g2d.scale(1, -1);
-            }
-            g2d.translate(-lx, -ly);
+            // g2d.translate(lx, ly); // 暫時將座標原點移至 label 中心
+            // // if (flipX != null && flipX) {
+            // //     g2d.scale(-1, 1);
+            // // }
+            // // if (flipY != null && flipY) {
+            // //     g2d.scale(1, -1);
+            // // }
+            // g2d.translate(-lx, -ly); // 將座標中心移回來
 
-            // 繪製背景
+            // 繪製 label 背景
             g2d.setColor(labelColor);
             g2d.fillRect(
                 lx - textWidth / 2 - padding,
-                ly - textHeight / 2,
+                ly - textHeight / 2 - padding,
                 textWidth + padding * 2,
-                textHeight
+                textHeight + padding * 2
             );
 
-            // 繪製文字
+            // 繪製 label 文字
             g2d.setColor(Color.BLACK);
             g2d.drawString(
                 label,
                 lx - textWidth / 2,
                 ly + fm.getAscent() / 2
-            );
+            ); // drawString(要寫的字串, 最左下的 x 座標, 最左下的 y 座標)
 
             // 恢復原始狀態
-            g2d.setTransform(originalTransform);
+            // g2d.setTransform(originalTransform);
         }
     }
 
-    /**
-     * 獲取形狀的邊界矩形
-     * @param obj 形狀物件
-     * @return 邊界矩形
-     */
+    // 取得物件的邊界矩形的 x, y, width, height
     private Rectangle getShapeBounds(Object obj) {
         if (obj instanceof Shape) {
             return ((Shape) obj).getBounds();
@@ -153,28 +147,22 @@ public class CanvasPanel extends JPanel {
         return new Rectangle();
     }
 
-    /**
-     * 繪製自訂線條（含箭頭）
-     * @param g2d 圖形上下文
-     * @param x1 起點X
-     * @param y1 起點Y
-     * @param x2 終點X
-     * @param y2 終點Y
-     * @param type 線條類型
-     */
+    // 繪製三種不同的 line (generalization, composit)ion, association)
     private void drawCustomLine(Graphics2D g2d, int x1, int y1, int x2, int y2, String type) {
-        // 計算線的角度
-        double angle = Math.atan2(y2 - y1, x2 - x1);
+        double angle = Math.atan2(y2 - y1, x2 - x1); // 計算線的角度
 
-        // 箭頭的大小
-        int arrowSize = 10;
+        int arrowSize = 10; // 箭頭的大小
 
-        // 畫線身 (從起點畫到離終點一段距離的地方，避免蓋到箭頭)
+        // 因為箭頭的 arrow 也會占地方，所以要預留一些空間給 arrow
         int lineEndX = x2 - (int)(Math.cos(angle) * arrowSize);
         int lineEndY = y2 - (int)(Math.sin(angle) * arrowSize);
-        g2d.drawLine(x1, y1, lineEndX, lineEndY);
-
-        // 根據類型畫箭頭
+        if ("association".equals(type)) {
+            g2d.drawLine(x1, y1, x2, y2); // association 的線段長度是 (x1, y1) 到 (x2, y2)，箭頭會畫在 (x2, y2) 的位置
+        } else {
+            g2d.drawLine(x1, y1, lineEndX, lineEndY); // 線段的真正長度是 (x1, y1) 到 (lineEndX, lineEndY)
+        }
+        
+        // 根據 type 畫箭頭 (尖角、三角形、鑽石型)
         if ("generalization".equals(type)) {
             drawHollowArrow(g2d, x2, y2, angle, arrowSize);
         } else if ("composition".equals(type)) {
@@ -184,86 +172,93 @@ public class CanvasPanel extends JPanel {
         }
     }
 
-    /**
-     * 繪製空心箭頭（一般化）
-     */
+    // 三角形 (generalization)
+    // x 和 y 是 arrow 的尖端
     private void drawHollowArrow(Graphics2D g2d, int x, int y, double angle, int size) {
-        Graphics2D g2dCopy = (Graphics2D) g2d.create();
+        Graphics2D g2dCopy = (Graphics2D) g2d.create(); // 複製一個新的 g2d 狀態，之後對 g2dCopy 的變換不會影響到原本的 g2d
         g2dCopy.translate(x, y);
         g2dCopy.rotate(angle);
 
-        g2dCopy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2dCopy.setStroke(new BasicStroke(1.5f));
+        // 開啟抗鋸齒，讓線條變更平滑
+        g2dCopy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON); // setRenderingHint(要設定的渲染提示行為(要控制抗鋸齒), 設定提示行為的值(開啟抗鋸齒)) 
+        g2dCopy.setStroke(new BasicStroke(1.5f)); // 線條粗細為 1.5 f
 
-        int width = 6;
-        int length = 8;
+        int width = 2*size;
+        int length = size;
 
+        // 三個點，(0, 0), (-length, -width/2), (-length, width/2)
         int[] xPoints = {0, -length, -length};
         int[] yPoints = {0, -width/2, width/2};
 
         g2dCopy.setColor(Color.BLACK);
         g2dCopy.drawPolygon(xPoints, yPoints, 3);
 
-        g2dCopy.dispose();
+        g2dCopy.dispose(); // 丟棄 g2dCopy，恢復到原本的 g2d 狀態
     }
 
-    /**
-     * 繪製實心菱形（組合）
-     */
+    // 鑽石型 (composition)
+    // x 和 y 是 arrow 的尖端
     private void drawSolidDiamond(Graphics2D g2d, int x, int y, double angle, int size) {
-        Graphics2D g2dCopy = (Graphics2D) g2d.create();
+        Graphics2D g2dCopy = (Graphics2D) g2d.create(); // 複製一個新的 g2d 狀態，之後對 g2dCopy 的變換不會影響到原本的 g2d
         g2dCopy.translate(x, y);
         g2dCopy.rotate(angle);
 
-        g2dCopy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2dCopy.setStroke(new BasicStroke(1.5f));
+        // 開啟抗鋸齒，讓線條變更平滑
+        g2dCopy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON); // setRenderingHint(要設定的渲染提示行為(要控制抗鋸齒), 設定提示行為的值(開啟抗鋸齒))
+        g2dCopy.setStroke(new BasicStroke(1.5f)); // 線條粗細為 1.5 f
 
-        int width = 12;
-        int height = 18;
+        int width = size*2;
+        int height = size;
 
-        int[] xPoints = {0, width/2, 0, -width/2};
-        int[] yPoints = {0, height/4, height/2, height/4};
+        // 四個點，(width/2, 0), (0, height/2), (-width/2, 0), (0, -height/2)
+        int[] xPoints = {width/2, 0, -width/2, 0};
+        int[] yPoints = {0, height/2, 0, -height/2};
 
         g2dCopy.setColor(Color.BLACK);
         g2dCopy.drawPolygon(xPoints, yPoints, 4);
 
-        g2dCopy.dispose();
+        g2dCopy.dispose(); // 丟棄 g2dCopy，恢復到原本的 g2d 狀態
     }
 
-    /**
-     * 繪製線箭頭（關聯）
-     */
+    // 尖角 (association)
+    // x 和 y 是 arrow 的尖端
     private void drawLineArrow(Graphics2D g2d, int x, int y, double angle, int size) {
-        Graphics2D g2dCopy = (Graphics2D) g2d.create();
+        Graphics2D g2dCopy = (Graphics2D) g2d.create(); // 複製一個新的 g2d 狀態，之後對 g2dCopy 的變換不會影響到原本的 g2d
         g2dCopy.translate(x, y);
         g2dCopy.rotate(angle);
 
-        g2dCopy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2dCopy.setStroke(new BasicStroke(1.5f));
+        // 開啟抗鋸齒，讓線條變更平滑
+        g2dCopy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON); // setRenderingHint(要設定的渲染提示行為(要控制抗鋸齒), 設定提示行為的值(開啟抗鋸齒))
+        g2dCopy.setStroke(new BasicStroke(1.5f)); // 線條粗細為 1.5 f
 
-        int width = 6;
-        int length = 8;
+        int width = size;
+        int length = size;
 
         int x1 = 0;
         int y1 = 0;
         int x2 = -length;
-        int y2 = -width / 2;
+        int y2 = -width;
         int x3 = -length;
-        int y3 = width / 2;
+        int y3 = width;
 
         g2dCopy.setColor(Color.BLACK);
-        g2dCopy.drawLine(x1, y1, x2, y2);
+
+        // 兩條線，(0, 0) 到 (-length, -width) 和 (0, 0) 到 (-length, width)
+        g2dCopy.drawLine(x1, y1, x2, y2); 
         g2dCopy.drawLine(x1, y1, x3, y3);
 
-        g2dCopy.dispose();
+        g2dCopy.dispose(); // 丟棄 g2dCopy，恢復到原本的 g2d 狀態
     }
 
+
+    // 初始及更改畫布上的東西， repaint() 後都會被叫一次
     @Override
     protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        Graphics2D g2d = (Graphics2D) g;
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2d.setColor(Color.BLACK);
+        super.paintComponent(g); // 繼承 CanvasPanel 的 paintComponent method，清空原本的畫面，畫出元件的背景
+        Graphics2D g2d = (Graphics2D) g; // 將 graphics 升成 graphics2d
+
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON); // 抗鋸齒，讓線條變更平滑
+        g2d.setColor(Color.BLACK); // 預設畫筆顏色為黑色
 
         // 更新所有Port位置
         for (ArrayList<Port> ports : shapePortsMap.values()) {
@@ -274,20 +269,20 @@ public class CanvasPanel extends JPanel {
 
         // 繪製形狀
         for (Object obj : shapes) {
-            boolean isShapeSelected = selectedShapes.contains(obj);
-            boolean isShapeHovered = (hoverShape == obj);
+            boolean isShapeSelected = selectedShapes.contains(obj); // 物件是否被選中
+            boolean isShapeHovered = (hoverShape == obj); // 配合滑鼠監聽器看看是否有 hover 該物件
 
-            if (obj instanceof Shape) {
-                Shape shape = (Shape) obj;
-                drawShape(g2d, shape, isShapeSelected, isShapeHovered);
-                drawLabel(g2d, obj);
+            if (obj instanceof CompositeShape) {
+                CompositeShape cs = (CompositeShape) obj;
+                drawCompositeShape(g2d, cs, isShapeSelected, isShapeHovered);
             } else if (obj instanceof MutableOval) {
                 MutableOval oval = (MutableOval) obj;
                 drawOval(g2d, oval, isShapeSelected, isShapeHovered);
                 drawLabel(g2d, obj);
-            } else if (obj instanceof CompositeShape) {
-                CompositeShape cs = (CompositeShape) obj;
-                drawCompositeShape(g2d, cs, isShapeSelected, isShapeHovered);
+            } else if (obj instanceof Shape) {
+                Shape shape = (Shape) obj; // 因為 rectagle 繼承 rectangle2d，rectangle2d 繼承 shape
+                drawShape(g2d, shape, isShapeSelected, isShapeHovered);
+                drawLabel(g2d, obj);
             }
         }
 
@@ -316,41 +311,42 @@ public class CanvasPanel extends JPanel {
         }
     }
 
-    /**
-     * 繪製普通形狀
-     */
+    // 畫矩形
     private void drawShape(Graphics2D g2d, Shape shape, boolean selected, boolean hovered) {
         if (selected || hovered) {
             g2d.setColor(Color.BLUE);
-            g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{5}, 0));
-            g2d.draw(shape);
+            g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10.0f, new float[]{5}, 0)); // 設定 g2d 的筆觸，getStroke(筆觸寬度, 線段末端形狀, 線段轉角處接法, 斜角限制, 虛線規則, 虛線模式從哪個相位開始畫)
+            g2d.draw(shape); // 因為 shape 已經有要畫的圖的幾何資訊了，矩形是 x, y, width, height
 
-            // 顯示Ports
             ArrayList<Port> ports = shapePortsMap.get(shape);
+
+            // 如果 port 已存在才進入
             if (ports != null) {
                 for (Port port : ports) {
+                    // port 塗滿白色
                     g2d.setColor(Color.WHITE);
                     g2d.fillRect(port.getX() - 3, port.getY() - 3, 6, 6);
+                    
+                    // port 用黑色虛線矩形框起來
                     g2d.setColor(Color.BLACK);
                     g2d.drawRect(port.getX() - 3, port.getY() - 3, 6, 6);
                 }
             }
         } else {
             g2d.setColor(Color.BLACK);
-            g2d.setStroke(new BasicStroke(1.0f));
+            g2d.setStroke(new BasicStroke(1.0f)); // 一般的筆，實線
             g2d.draw(shape);
         }
     }
 
-    /**
-     * 繪製橢圓
-     */
+    // 畫橢圓
     private void drawOval(Graphics2D g2d, MutableOval oval, boolean selected, boolean hovered) {
-        Shape shape = new Ellipse2D.Float(oval.getX(), oval.getY(), oval.getWidth(), oval.getHeight());
+        // 
+        Shape shape = new Ellipse2D.Float(oval.getX(), oval.getY(), oval.getWidth(), oval.getHeight()); // 取得橢圓的邊界矩形 x, y, width, height
 
         if (selected || hovered) {
             g2d.setColor(Color.BLUE);
-            g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{5}, 0));
+            g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10.0f, new float[]{5}, 0));
         } else {
             g2d.setColor(Color.BLACK);
             g2d.setStroke(new BasicStroke(1.0f));
@@ -359,10 +355,14 @@ public class CanvasPanel extends JPanel {
 
         if (selected || hovered) {
             ArrayList<Port> ports = shapePortsMap.get(oval);
+
             if (ports != null) {
                 for (Port port : ports) {
+                    // port 塗滿白色
                     g2d.setColor(Color.WHITE);
                     g2d.fillRect(port.getX() - 3, port.getY() - 3, 6, 6);
+                    
+                    // port 用黑色虛線矩形框起來
                     g2d.setColor(Color.BLACK);
                     g2d.drawRect(port.getX() - 3, port.getY() - 3, 6, 6);
                 }
@@ -370,18 +370,16 @@ public class CanvasPanel extends JPanel {
         }
     }
 
-    /**
-     * 繪製複合形狀
-     */
+    // 畫 composite
     private void drawCompositeShape(Graphics2D g2d, CompositeShape cs, boolean selected, boolean hovered) {
-        // 先畫子物件
+        // 因為 oval 繼承 shapeinterface，而 shapeinterface 繼承 object 而非 shape，所以不能用 list<shape>
         for (Object child : cs.getChildren()) {
-            if (child instanceof Shape) {
+            if (child instanceof Shape) { // 也就是 rectangle (包含 composite，因為 composite 繼承 rectangle)
                 g2d.setColor(Color.BLACK);
                 g2d.setStroke(new BasicStroke(1.0f));
                 g2d.draw((Shape) child);
             } else if (child instanceof MutableOval) {
-                MutableOval oval = (MutableOval) child;
+                MutableOval oval = (MutableOval) child; // 因為 child 是 object，沒有 getX(), getY() 等等 methods
                 Shape shape = new Ellipse2D.Float(oval.getX(), oval.getY(), oval.getWidth(), oval.getHeight());
                 g2d.setColor(Color.BLACK);
                 g2d.setStroke(new BasicStroke(1.0f));
@@ -389,7 +387,7 @@ public class CanvasPanel extends JPanel {
             }
         }
 
-        // 再畫群組框
+        // 畫 composite 框
         if (selected || hovered) {
             g2d.setColor(Color.BLUE);
             g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{5}, 0));
@@ -397,15 +395,8 @@ public class CanvasPanel extends JPanel {
             g2d.setColor(Color.BLACK);
             g2d.setStroke(new BasicStroke(1.0f));
         }
-        g2d.draw(cs.getBounds());
+        g2d.draw(cs.getBounds()); // 將 compositebounds 算出的 minx, miny, maxx, maxy 畫出相對應的矩形
     }
-
-    // 其他方法將在後續添加...
-
-    /**
-     * 獲取當前模式（需要由外部設定）
-     */
-    private String currentMode = "select";
 
     public void setCurrentMode(String mode) {
         this.currentMode = mode;
@@ -415,12 +406,7 @@ public class CanvasPanel extends JPanel {
         return currentMode;
     }
 
-    /**
-     * 尋找指定位置的Port
-     * @param x X座標
-     * @param y Y座標
-     * @return 找到的Port，如果沒有則返回null
-     */
+    // 找找 (x, y) 所在的位置是哪個 port 佔的
     private Port findPortAt(int x, int y) {
         // 反向遍歷，讓最上層的圖形優先被檢查
         for (int i = shapes.size() - 1; i >= 0; i--) {
@@ -437,12 +423,7 @@ public class CanvasPanel extends JPanel {
         return null;
     }
 
-    /**
-     * 尋找指定位置的形狀
-     * @param x X座標
-     * @param y Y座標
-     * @return 找到的形狀物件，如果沒有則返回null
-     */
+    
     private Object findShapeAt(int x, int y) {
         // 先找群組
         for (int i = shapes.size() - 1; i >= 0; i--) {
@@ -464,7 +445,7 @@ public class CanvasPanel extends JPanel {
                 }
             } else if (obj instanceof MutableOval) {
                 MutableOval oval = (MutableOval) obj;
-                Ellipse2D shape = new Ellipse2D.Float(oval.getX(), oval.getY(), oval.getWidth(), oval.getHeight());
+                Ellipse2D shape = new Ellipse2D.Float(oval.getX(), oval.getY(), oval.getWidth(), oval.getHeight()); // 因為要看看點擊的點是不是在 oval 裡面，所以還是用內建的 ellipse2d 比較好
                 if (shape.contains(x, y)) {
                     return obj;
                 }
@@ -473,12 +454,10 @@ public class CanvasPanel extends JPanel {
         return null;
     }
 
-    /**
-     * 更新形狀的Ports
-     * @param obj 形狀物件
-     */
+    
+    // 建立 Object 的 ports 或更新 ports 位置
     private void updateShapePorts(Object obj) {
-        ArrayList<Port> ports = shapePortsMap.get(obj);
+        ArrayList<Port> ports = shapePortsMap.get(obj); // 取 obj 的 ports list
 
         if (ports == null) {
             ports = new ArrayList<>();
@@ -490,8 +469,8 @@ public class CanvasPanel extends JPanel {
                 for (int i = 0; i < 4; i++) {
                     ports.add(new Port(obj, i));
                 }
-            }
-            shapePortsMap.put(obj, ports);
+            } 
+            shapePortsMap.put(obj, ports); // 將建立好的 ports list 塞進 shapePortsMap
         } else {
             for (Port p : ports) {
                 p.updatePosition();
@@ -508,6 +487,8 @@ public class CanvasPanel extends JPanel {
         List<Object> groupChildren = new ArrayList<>(selectedShapes);
         CompositeShape group = new CompositeShape(groupChildren);
 
+        // 移除已被群組化的子物件，避免它們仍然存在於 top-level shapes
+        shapes.removeAll(groupChildren);
         shapes.add(group);
         selectedShapes.clear();
         selectedShapes.add(group);
@@ -515,6 +496,7 @@ public class CanvasPanel extends JPanel {
         for (Object child : groupChildren) {
             updateShapePorts(child);
         }
+        updateShapePorts(group);
         repaint();
     }
 
@@ -622,11 +604,11 @@ public class CanvasPanel extends JPanel {
 
             if (flipX) {
                 int temp = newLeft; newLeft = newRight; newRight = temp;
-                shapeLabelFlipX.put(shape, !shapeLabelFlipX.get(shape));
+                // shapeLabelFlipX.put(shape, !shapeLabelFlipX.get(shape));
             }
             if (flipY) {
                 int temp = newTop; newTop = newBottom; newBottom = temp;
-                shapeLabelFlipY.put(shape, !shapeLabelFlipY.get(shape));
+                // shapeLabelFlipY.put(shape, !shapeLabelFlipY.get(shape));
             }
 
             int newX = Math.min(newLeft, newRight);
@@ -662,11 +644,11 @@ public class CanvasPanel extends JPanel {
 
             if (flipX) {
                 int temp = newLeft; newLeft = newRight; newRight = temp;
-                shapeLabelFlipX.put(shape, !shapeLabelFlipX.get(shape));
+                // shapeLabelFlipX.put(shape, !shapeLabelFlipX.get(shape));
             }
             if (flipY) {
                 int temp = newTop; newTop = newBottom; newBottom = temp;
-                shapeLabelFlipY.put(shape, !shapeLabelFlipY.get(shape));
+                // shapeLabelFlipY.put(shape, !shapeLabelFlipY.get(shape));
             }
 
             int newX = Math.min(newLeft, newRight);
@@ -708,71 +690,57 @@ public class CanvasPanel extends JPanel {
                 updateShapePorts(oval);
             }
         }
+        group.updateBoundsOnly();
         updateShapePorts(group);
         repaint();
     }
 
-    // Getter 方法
-    public List<Object> getSelectedShapes() { return selectedShapes; }
-    public Map<Object, String> getShapeLabels() { return shapeLabels; }
-    public Map<Object, Color> getShapeLabelColors() { return shapeLabelColors; }
-
-    /**
-     * MouseHandler 內部類別：處理滑鼠事件
-     */
+    // 滑鼠監聽事件
     private class MouseHandler extends MouseAdapter {
         @Override
+        // 滑鼠被按下時
         public void mousePressed(MouseEvent e) {
             if ("association".equals(currentMode) || "generalization".equals(currentMode) || "composition".equals(currentMode)) {
-                Port port = findPortAt(e.getX(), e.getY());
+                Port port = findPortAt(e.getX(), e.getY()); // 找出現在點擊的點時哪個 port
                 if (port != null) {
                     tempStartPort = port;
                     System.out.println("Start port set at: (" + port.getX() + ", " + port.getY() + ")");
                 }
             } else if ("select".equals(currentMode)) {
                 Point p = e.getPoint();
-                Object targetShape = findShapeAt(p.x, p.y);
-                Port port = findPortAt(e.getX(), e.getY());
+                Object targetShape = findShapeAt(p.x, p.y); // 找找點擊的點所在的形狀是誰
+                Port port = findPortAt(e.getX(), e.getY()); // 也有可能剛好點擊在 port 上
 
+                // 如果剛好點擊在 port 上
                 if (port != null) {
                     if (!(port.getParentShape() instanceof CompositeShape)) {
-                        resizingPort = port;
-                        resizingShape = port.getParentShape();
+                        resizingPort = port; // 更新 Port resizingPort
+                        resizingShape = port.getParentShape(); // 更新 Object resizingShape
                         return;
                     }
                 }
 
-                if (targetShape == null) {
-                    for (int i = shapes.size() - 1; i >= 0; i--) {
-                        Object shape = shapes.get(i);
-                        if (!(shape instanceof CompositeShape)) {
-                            if (shape instanceof Shape && ((Shape) shape).contains(p.x, p.y)) {
-                                targetShape = shape;
-                                break;
-                            } else if (shape instanceof MutableOval && ((MutableOval) shape).contains(p.x, p.y)) {
-                                targetShape = shape;
-                                break;
-                            }
-                        }
-                    }
-                }
+                // if (targetShape == null) {
+                //     for (int i = shapes.size() - 1; i >= 0; i--) {
+                //         Object shape = shapes.get(i);
+                //         if (!(shape instanceof CompositeShape)) {
+                //             if (shape instanceof Shape && ((Shape) shape).contains(p.x, p.y)) {
+                //                 targetShape = shape;
+                //                 break;
+                //             } else if (shape instanceof MutableOval && ((MutableOval) shape).contains(p.x, p.y)) {
+                //                 targetShape = shape;
+                //                 break;
+                //             }
+                //         }
+                //     }
+                // }
 
-                boolean isCtrlPressed = (e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0;
+                // ctrl 有沒有被按下
+                // boolean isCtrlPressed = (e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0;
 
                 if (targetShape != null) {
-                    if (isCtrlPressed) {
-                        if (selectedShapes.contains(targetShape)) {
-                            selectedShapes.remove(targetShape);
-                        } else {
-                            if (targetShape instanceof CompositeShape) {
-                                selectedShapes.clear();
-                            }
-                            selectedShapes.add(targetShape);
-                        }
-                    } else {
-                        selectedShapes.clear();
-                        selectedShapes.add(targetShape);
-                    }
+                    selectedShapes.clear();
+                    selectedShapes.add(targetShape);
                     rubberBandStart = null;
                     rubberBandRect = null;
                     System.out.println("Object selected: " + targetShape.getClass().getSimpleName());
@@ -881,18 +849,21 @@ public class CanvasPanel extends JPanel {
             }
         }
 
+        // 在滑鼠移動時更新 hoverShape，並根據 hover 狀態改變游標
         @Override
         public void mouseMoved(MouseEvent e) {
-            if (!"select".equals(currentMode)) return;
+            if (!"select".equals(currentMode)) return; // 要是 select mode 才有動作
 
             Point p = e.getPoint();
             Object hitShape = findShapeAt(p.x, p.y);
 
+            // 更新 hoverShape 為使用者點擊的物件
             if (hoverShape != hitShape) {
                 hoverShape = hitShape;
                 repaint();
             }
 
+            // 滑鼠 hover 到物件時，將游標形狀改成手指，否則改回預設
             if (hitShape != null) {
                 setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             } else {
@@ -900,4 +871,9 @@ public class CanvasPanel extends JPanel {
             }
         }
     }
+
+    // getters
+    public List<Object> getSelectedShapes() { return selectedShapes; }
+    public Map<Object, String> getShapeLabels() { return shapeLabels; }
+    public Map<Object, Color> getShapeLabelColors() { return shapeLabelColors; }
 }
