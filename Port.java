@@ -101,19 +101,42 @@ public class Port {
         }
     }
 
-    
     public boolean contains(int mx, int my) {
         return Math.abs(mx - x) <= 5 && Math.abs(my - y) <= 5;
     }
 
-    // Getter 和 Setter 方法
-    public int getX() { return x; }
-    public int getY() { return y; }
-    public Object getParentShape() { return parentShape; }
-    public int getType() { return type; }
+    // getter
+    public int getX() { 
+        return x; 
+    }
 
-    public void setX(int x) { this.x = x; }
-    public void setY(int y) { this.y = y; }
-    public void setParentShape(Object parentShape) { this.parentShape = parentShape; }
-    public void setType(int type) { this.type = type; }
+    public int getY() { 
+        return y; 
+    }
+
+    public Object getParentShape() {
+        return parentShape; 
+    }
+    
+    public int getType() {
+        return type; 
+    }
+
+    
+    // setter
+    public void setX(int x) {
+        this.x = x; 
+    }
+    
+    public void setY(int y) { 
+        this.y = y; 
+    }
+
+    public void setParentShape(Object parentShape) { 
+        this.parentShape = parentShape; 
+    }
+    
+    public void setType(int type) { 
+        this.type = type; 
+    }
 }

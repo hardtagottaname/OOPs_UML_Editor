@@ -289,7 +289,7 @@ public class CanvasPanel extends JPanel {
         // 繪製框選矩形
         if ("select".equals(getCurrentMode()) && rubberBandRect != null) {
             float[] dash = {5.0f};
-            g2d.setStroke(new BasicStroke(1.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, dash, 0.0f));
+            g2d.setStroke(new BasicStroke(1.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10.0f, dash, 0.0f)); // 設定 g2d 的筆觸，getStroke(筆觸寬度, 線段末端形狀, 線段轉角處接法, 斜角限制, 虛線規則, 虛線模式從哪個相位開始畫)
             g2d.setColor(Color.BLUE);
             g2d.draw(rubberBandRect);
         }
@@ -305,7 +305,7 @@ public class CanvasPanel extends JPanel {
         // 繪製臨時線條
         if (tempStartPort != null && tempLineEnd != null) {
             float[] dash = {5.0f};
-            g2d.setStroke(new BasicStroke(1.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, dash, 0.0f));
+            g2d.setStroke(new BasicStroke(1.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10.0f, dash, 0.0f)); // 設定 g2d 的筆觸，getStroke(筆觸寬度, 線段末端形狀, 線段轉角處接法, 斜角限制, 虛線規則, 虛線模式從哪個相位開始畫)
             g2d.drawLine(tempStartPort.getX(), tempStartPort.getY(), tempLineEnd.x, tempLineEnd.y);
             g2d.setStroke(new BasicStroke(1.0f));
         }
@@ -346,7 +346,7 @@ public class CanvasPanel extends JPanel {
 
         if (selected || hovered) {
             g2d.setColor(Color.BLUE);
-            g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10.0f, new float[]{5}, 0));
+            g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10.0f, new float[]{5}, 0)); // 設定 g2d 的筆觸，getStroke(筆觸寬度, 線段末端形狀, 線段轉角處接法, 斜角限制, 虛線規則, 虛線模式從哪個相位開始畫)
         } else {
             g2d.setColor(Color.BLACK);
             g2d.setStroke(new BasicStroke(1.0f));
@@ -390,7 +390,7 @@ public class CanvasPanel extends JPanel {
         // 畫 composite 框
         if (selected || hovered) {
             g2d.setColor(Color.BLUE);
-            g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{5}, 0));
+            g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10.0f, new float[]{5}, 0)); // 設定 g2d 的筆觸，getStroke(筆觸寬度, 線段末端形狀, 線段轉角處接法, 斜角限制, 虛線規則, 虛線模式從哪個相位開始畫)
         } else {
             g2d.setColor(Color.BLACK);
             g2d.setStroke(new BasicStroke(1.0f));
@@ -423,7 +423,7 @@ public class CanvasPanel extends JPanel {
         return null;
     }
 
-    
+    // 找找現在點擊的點是哪個物件 (rectangle, oval, composite) 在的地方
     private Object findShapeAt(int x, int y) {
         // 先找群組
         for (int i = shapes.size() - 1; i >= 0; i--) {
@@ -457,6 +457,12 @@ public class CanvasPanel extends JPanel {
     
     // 建立 Object 的 ports 或更新 ports 位置
     private void updateShapePorts(Object obj) {
+        // CompositeShape 不應該有可連線的 ports
+        if (obj instanceof CompositeShape) {
+            shapePortsMap.remove(obj);
+            return; 
+        }
+
         ArrayList<Port> ports = shapePortsMap.get(obj); // 取 obj 的 ports list
 
         if (ports == null) {
@@ -469,7 +475,7 @@ public class CanvasPanel extends JPanel {
                 for (int i = 0; i < 4; i++) {
                     ports.add(new Port(obj, i));
                 }
-            } 
+            }
             shapePortsMap.put(obj, ports); // 將建立好的 ports list 塞進 shapePortsMap
         } else {
             for (Port p : ports) {
@@ -478,16 +484,14 @@ public class CanvasPanel extends JPanel {
         }
     }
 
-    /**
-     * 將選中的形狀組成群組
-     */
+    // 組成 composite
     public void groupSelected() {
         if (selectedShapes.size() < 2) return;
 
         List<Object> groupChildren = new ArrayList<>(selectedShapes);
         CompositeShape group = new CompositeShape(groupChildren);
 
-        // 移除已被群組化的子物件，避免它們仍然存在於 top-level shapes
+        // 將 composite 的子物件移除 shapes，並將 omposite 好的大物件塞進 selectedShapes 和 shapes 裡面
         shapes.removeAll(groupChildren);
         shapes.add(group);
         selectedShapes.clear();
@@ -496,42 +500,16 @@ public class CanvasPanel extends JPanel {
         for (Object child : groupChildren) {
             updateShapePorts(child);
         }
-        updateShapePorts(group);
         repaint();
     }
 
-    /**
-     * 取消選中形狀的群組
-     * 遞歸地解開所有巢狀群組，直到只剩下基本形狀
-     */
+    // 取消已組成的 composite
     public void ungroupSelected() {
         if (selectedShapes.size() != 1) return;
 
         Object sel = selectedShapes.get(0);
         if (sel instanceof CompositeShape) {
             CompositeShape group = (CompositeShape) sel;
-
-            // 移除相關的線條
-            ArrayList<Line> linesToRemove = new ArrayList<>();
-            for (Line line : lines) {
-                Object startParent = line.getStart().getParentShape();
-                Object endParent = line.getEnd().getParentShape();
-
-                if (startParent == group || endParent == group) {
-                    linesToRemove.add(line);
-                    continue;
-                }
-
-                // 檢查是否連接到任何將被解開的形狀
-                List<Object> allUngroupedShapes = getAllUngroupedShapes(group);
-                for (Object ungroupedShape : allUngroupedShapes) {
-                    if (startParent == ungroupedShape || endParent == ungroupedShape) {
-                        linesToRemove.add(line);
-                        break;
-                    }
-                }
-            }
-            lines.removeAll(linesToRemove);
 
             // 遞歸地解開群組並獲取所有基本形狀
             List<Object> ungroupedShapes = getAllUngroupedShapes(group);
@@ -549,11 +527,7 @@ public class CanvasPanel extends JPanel {
         repaint();
     }
 
-    /**
-     * 遞歸地獲取CompositeShape中所有非群組的基本形狀
-     * @param shape 要解開的形狀（可能是CompositeShape）
-     * @return 所有基本形狀的列表
-     */
+    // 將 composite ungroup
     private List<Object> getAllUngroupedShapes(Object shape) {
         List<Object> result = new ArrayList<>();
 
@@ -571,56 +545,81 @@ public class CanvasPanel extends JPanel {
         return result;
     }
 
-    /**
-     * 調整形狀大小
-     * @param shape 要調整的形狀
-     * @param port 調整的Port
-     * @param mx 滑鼠X座標
-     * @param my 滑鼠Y座標
-     */
+    // 更新 shape 的大小或位置
     private void resizeShape(Object shape, Port port, int mx, int my) {
         int minSize = 30;
 
         if (shape instanceof Rectangle) {
             Rectangle rect = (Rectangle) shape;
-            int x1 = rect.x, y1 = rect.y;
-            int x2 = rect.x + rect.width, y2 = rect.y + rect.height;
+            int x1 = rect.x;
+            int y1 = rect.y;
+            
+            int x2 = rect.x + rect.width;
+            int y2 = rect.y + rect.height;
 
             int newLeft = x1, newTop = y1, newRight = x2, newBottom = y2;
 
             switch (port.getType()) {
-                case 0: newLeft = mx; newTop = my; break; // TL
-                case 1: newTop = my; break; // T
-                case 2: newTop = my; newRight = mx; break; // TR
-                case 3: newRight = mx; break; // R
-                case 4: newRight = mx; newBottom = my; break; // BR
-                case 5: newBottom = my; break; // B
-                case 6: newLeft = mx; newBottom = my; break; // BL
-                case 7: newLeft = mx; break; // L
+                case 0: 
+                    newLeft = mx; 
+                    newTop = my; 
+                    break;
+                case 1: 
+                    newTop = my; 
+                    break;
+                case 2: 
+                    newTop = my; 
+                    newRight = mx; 
+                    break;
+                case 3: 
+                    newRight = mx; 
+                    break;
+                case 4: 
+                    newRight = mx; 
+                    newBottom = my; 
+                    break;
+                case 5: 
+                    newBottom = my; 
+                    break;
+                case 6: 
+                    newLeft = mx; 
+                    newBottom = my; 
+                    break;
+                case 7: 
+                    newLeft = mx; 
+                    break;
             }
 
-            boolean flipX = newRight < newLeft;
-            boolean flipY = newBottom < newTop;
-
-            if (flipX) {
-                int temp = newLeft; newLeft = newRight; newRight = temp;
-                // shapeLabelFlipX.put(shape, !shapeLabelFlipX.get(shape));
+            if (newRight < newLeft) {
+                int temp = newLeft;
+                newLeft = newRight;
+                newRight = temp;
             }
-            if (flipY) {
-                int temp = newTop; newTop = newBottom; newBottom = temp;
-                // shapeLabelFlipY.put(shape, !shapeLabelFlipY.get(shape));
+
+            if (newBottom < newTop) {
+                int temp = newTop;
+                newTop = newBottom;
+                newBottom = temp;
             }
 
             int newX = Math.min(newLeft, newRight);
             int newY = Math.min(newTop, newBottom);
-            int newW = Math.abs(newRight - newLeft);
-            int newH = Math.abs(newBottom - newTop);
 
-            if (newW < minSize) newW = minSize;
-            if (newH < minSize) newH = minSize;
+            int newW = newRight - newLeft;
+            int newH = newBottom - newTop;
 
-            rect.x = newX;
-            rect.y = newY;
+            if (newW < minSize) {
+                newW = minSize;
+            } else {
+                rect.x = newX;
+            }
+
+            if (newH < minSize) {
+                newH = minSize;
+            } else {
+                rect.y = newY;
+            }
+
             rect.width = newW;
             rect.height = newH;
             updateShapePorts(rect);
@@ -633,46 +632,45 @@ public class CanvasPanel extends JPanel {
             int newLeft = x1, newTop = y1, newRight = x2, newBottom = y2;
 
             switch (port.getType()) {
-                case 0: newTop = my; break; // Top
-                case 1: newRight = mx; break; // Right
-                case 2: newBottom = my; break; // Bottom
-                case 3: newLeft = mx; break; // Left
-            }
-
-            boolean flipX = newRight < newLeft;
-            boolean flipY = newBottom < newTop;
-
-            if (flipX) {
-                int temp = newLeft; newLeft = newRight; newRight = temp;
-                // shapeLabelFlipX.put(shape, !shapeLabelFlipX.get(shape));
-            }
-            if (flipY) {
-                int temp = newTop; newTop = newBottom; newBottom = temp;
-                // shapeLabelFlipY.put(shape, !shapeLabelFlipY.get(shape));
+                case 0: // 上
+                    newTop = my;
+                    break;
+                case 1: // 右
+                    newRight = mx; 
+                    break; 
+                case 2: // 下
+                    newBottom = my; 
+                    break; 
+                case 3: // 左
+                    newLeft = mx; 
+                    break; 
             }
 
             int newX = Math.min(newLeft, newRight);
             int newY = Math.min(newTop, newBottom);
-            int newW = Math.abs(newRight - newLeft);
-            int newH = Math.abs(newBottom - newTop);
+            
+            int newW = newRight - newLeft;
+            int newH = newBottom - newTop;
 
-            if (newW < minSize) newW = minSize;
-            if (newH < minSize) newH = minSize;
-
-            oval.setX(newX);
-            oval.setY(newY);
+            if (newW < minSize) {
+                newW = minSize;
+            } else {
+                oval.setX(newX);
+            }
+                
+            if (newH < minSize) {
+                newH = minSize;
+            } else {
+                oval.setY(newY);
+            }
+                
             oval.setWidth(newW);
             oval.setHeight(newH);
             updateShapePorts(oval);
         }
     }
 
-    /**
-     * 移動複合形狀
-     * @param group 群組
-     * @param deltaX X方向位移
-     * @param deltaY Y方向位移
-     */
+    // 移動 composite 物件 (裡面的 child 物件也要一起移動)
     private void moveCompositeShape(CompositeShape group, int deltaX, int deltaY) {
         group.x += deltaX;
         group.y += deltaY;
@@ -697,11 +695,13 @@ public class CanvasPanel extends JPanel {
 
     // 滑鼠監聽事件
     private class MouseHandler extends MouseAdapter {
-        @Override
         // 滑鼠被按下時
+        @Override
         public void mousePressed(MouseEvent e) {
             if ("association".equals(currentMode) || "generalization".equals(currentMode) || "composition".equals(currentMode)) {
                 Port port = findPortAt(e.getX(), e.getY()); // 找出現在點擊的點時哪個 port
+                
+                // 有可能要畫線
                 if (port != null) {
                     tempStartPort = port;
                     System.out.println("Start port set at: (" + port.getX() + ", " + port.getY() + ")");
@@ -720,24 +720,7 @@ public class CanvasPanel extends JPanel {
                     }
                 }
 
-                // if (targetShape == null) {
-                //     for (int i = shapes.size() - 1; i >= 0; i--) {
-                //         Object shape = shapes.get(i);
-                //         if (!(shape instanceof CompositeShape)) {
-                //             if (shape instanceof Shape && ((Shape) shape).contains(p.x, p.y)) {
-                //                 targetShape = shape;
-                //                 break;
-                //             } else if (shape instanceof MutableOval && ((MutableOval) shape).contains(p.x, p.y)) {
-                //                 targetShape = shape;
-                //                 break;
-                //             }
-                //         }
-                //     }
-                // }
-
-                // ctrl 有沒有被按下
-                // boolean isCtrlPressed = (e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0;
-
+                // 看看有沒有選中東西
                 if (targetShape != null) {
                     selectedShapes.clear();
                     selectedShapes.add(targetShape);
@@ -746,26 +729,29 @@ public class CanvasPanel extends JPanel {
                     System.out.println("Object selected: " + targetShape.getClass().getSimpleName());
                 } else {
                     selectedShapes.clear();
-                    rubberBandStart = p;
-                    rubberBandRect = null;
+                    rubberBandStart = p; // 預備可能要用拖曳選擇一大塊區域
+                    rubberBandRect = null; // 清空選擇框
                     System.out.println("Start Rubber Band Selection");
                 }
                 dragging = false;
-                lastMousePoint = e.getPoint();
+                lastMousePoint = e.getPoint(); // 先設定 lastMousePoint 是現在所點的位置，之後再實時更新
                 repaint();
             }
         }
 
+        // 滑鼠被拖曳時 (還沒看完)
         @Override
         public void mouseDragged(MouseEvent e) {
             Point currentPoint = e.getPoint();
 
+            // 如果是要移動非 composite 的物件 (rectangle, oval)
             if (resizingPort != null && resizingShape != null) {
                 resizeShape(resizingShape, resizingPort, e.getX(), e.getY());
                 repaint();
                 return;
             }
 
+            // 如果要畫線，更新 line end
             if (tempStartPort != null) {
                 tempLineEnd = currentPoint;
                 repaint();
