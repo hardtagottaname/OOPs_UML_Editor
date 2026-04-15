@@ -291,7 +291,7 @@ public class CanvasPanel extends JPanel {
         if ("select".equals(getCurrentMode()) && rubberBandRect != null) {
             float[] dash = {5.0f};
             g2d.setStroke(new BasicStroke(1.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10.0f, dash, 0.0f)); // 設定 g2d 的筆觸，getStroke(筆觸寬度, 線段末端形狀, 線段轉角處接法, 斜角限制, 虛線規則, 虛線模式從哪個相位開始畫)
-            g2d.setColor(Color.BLUE);
+            g2d.setColor(Color.BLUE); // 讓選擇的邊框是藍色
             g2d.draw(rubberBandRect);
         }
 
@@ -546,25 +546,26 @@ public class CanvasPanel extends JPanel {
         return result;
     }
 
+    // 矩形反向拖曳用(傳對角 point)
     private Point getAnchorPoint(Object shape, Port port) {
-        Rectangle b = getShapeBounds(shape);
+        Rectangle b = getShapeBounds(shape); // 取邊界矩形
 
         switch (port.getType()) {
-            case 0: 
-                return new Point(b.x + b.width, b.y + b.height); // 左上 → 右下
-            case 1: 
+            case 0: // 現在是 0 port，傳 4 port 的點
+                return new Point(b.x + b.width, b.y + b.height); 
+            case 1: // 現在是 1 port，傳 5 port 的點
                 return new Point(b.x + b.width / 2, b.y + b.height); 
-            case 2: 
+            case 2: // 現在是 2 port，傳 6 port 的點
                 return new Point(b.x, b.y + b.height);
-            case 3: 
+            case 3: // 現在是 3 port，傳 7 port 的點
                 return new Point(b.x, b.y + b.height / 2);
-            case 4: 
+            case 4: // 現在是 4 port，傳 0 port 的點
                 return new Point(b.x, b.y);
-            case 5: 
+            case 5: // 現在是 5 port，傳 1 port 的點
                 return new Point(b.x + b.width / 2, b.y);
-            case 6: 
+            case 6: // 現在是 6 port，傳 2 port 的點
                 return new Point(b.x + b.width, b.y);
-            case 7: 
+            case 7: // 現在是 7 port，傳 3 port 的點
                 return new Point(b.x + b.width, b.y + b.height / 2);
         }
 
@@ -573,11 +574,14 @@ public class CanvasPanel extends JPanel {
 
     // 更新 shape 的大小或位置
     private void resizeShape(Object shape, Port port, int mx, int my) {
+        // 最小最小只能 30
         int minSize = 30;
 
         if (shape instanceof Rectangle) {
-            Rectangle rect = (Rectangle) shape;
+            Rectangle rect = (Rectangle) shape; // 升成 rectangle
 
+            // 解決反向拖曳
+            // 更新對角的 port 和現在相比的最小、最大 x, y
             int newLeft   = Math.min(resizeAnchor.x, mx);
             int newRight  = Math.max(resizeAnchor.x, mx);
             int newTop    = Math.min(resizeAnchor.y, my);
@@ -593,18 +597,22 @@ public class CanvasPanel extends JPanel {
             rect.y = newTop;
             rect.width  = newW;
             rect.height = newH;
-            
-            
-            rect.width = newW;
-            rect.height = newH;
+
+            // 重新規劃 ports
             updateShapePorts(rect);
 
         } else if (shape instanceof MutableOval) {
             MutableOval oval = (MutableOval) shape;
-            int x1 = oval.getX(), y1 = oval.getY();
-            int x2 = oval.getX() + oval.getWidth(), y2 = oval.getY() + oval.getHeight();
+            
+            int x1 = oval.getX();
+            int y1 = oval.getY();
+            int x2 = oval.getX() + oval.getWidth();
+            int y2 = oval.getY() + oval.getHeight();
 
-            int newLeft = x1, newTop = y1, newRight = x2, newBottom = y2;
+            int newLeft = x1;
+            int newTop = y1;
+            int newRight = x2;
+            int newBottom = y2;
 
             switch (port.getType()) {
                 case 0: // 上
@@ -641,6 +649,8 @@ public class CanvasPanel extends JPanel {
                 
             oval.setWidth(newW);
             oval.setHeight(newH);
+
+            // 更新橢圓的 ports
             updateShapePorts(oval);
         }
     }
@@ -715,7 +725,7 @@ public class CanvasPanel extends JPanel {
             }
         }
 
-        // 滑鼠被拖曳時 (還沒看完)
+        // 滑鼠被拖曳時
         @Override
         public void mouseDragged(MouseEvent e) {
             Point currentPoint = e.getPoint();
@@ -735,11 +745,13 @@ public class CanvasPanel extends JPanel {
             }
 
             if ("select".equals(currentMode) && rubberBandStart == null && !selectedShapes.isEmpty()) {
+                // 計算被移動的距離
                 int deltaX = currentPoint.x - lastMousePoint.x;
                 int deltaY = currentPoint.y - lastMousePoint.y;
 
                 if (Math.abs(deltaX) > 0 || Math.abs(deltaY) > 0) {
                     for (Object shape : selectedShapes) {
+                        // 移動 composite (moveCompositeShape 包含移動裡面的 children)
                         if (shape instanceof CompositeShape) {
                             moveCompositeShape((CompositeShape) shape, deltaX, deltaY);
                         } else {
@@ -756,27 +768,35 @@ public class CanvasPanel extends JPanel {
                             updateShapePorts(shape);
                         }
                     }
+
+                    // 不斷更新現在拖曳的位置
                     lastMousePoint = currentPoint;
                     repaint();
                 }
                 return;
             }
 
+            // 如果拖曳框存在 (要選擇一大堆東西)
             if ("select".equals(currentMode) && rubberBandStart != null) {
                 Point start = rubberBandStart;
+
                 int x = Math.min(start.x, currentPoint.x);
                 int y = Math.min(start.y, currentPoint.y);
+                
                 int width = Math.abs(start.x - currentPoint.x);
                 int height = Math.abs(start.y - currentPoint.y);
-                rubberBandRect = new Rectangle(x, y, width, height);
+                
+                rubberBandRect = new Rectangle(x, y, width, height); // 不斷更新選擇的拖曳框框
                 repaint();
             }
         }
 
+        // 滑鼠被放開時
         @Override
         public void mouseReleased(MouseEvent e) {
             resizingPort = null;
             resizingShape = null;
+            resizeAnchor = null;
             dragging = false;
 
             if (tempStartPort != null) {
