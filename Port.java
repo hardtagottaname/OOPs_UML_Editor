@@ -19,7 +19,7 @@ public class Port {
     
     public void updatePosition() {
 
-        // System.out.println("Updating port position for type " + type + " of parent shape: " + parentShape.getClass().getSimpleName());
+        System.out.println("Updating port position for type " + type + " of parent shape: " + parentShape.getClass().getSimpleName());
 
         // 若為矩形
         if (parentShape instanceof Rectangle) {

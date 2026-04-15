@@ -8,7 +8,4 @@ public interface ShapeInterface {
 
     // getBounds => 取得矩形或橢圓形或組合的邊界矩形
     Rectangle getBounds();
-
-    // updateBounds => 因為拉伸而更新矩形或橢圓形或組合的位置和大小
-    // void updateBounds(int x, int y, int width, int height);
 }

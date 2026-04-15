@@ -1,7 +1,6 @@
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.geom.AffineTransform;
 import java.awt.geom.Ellipse2D;
 import java.util.*;
 import java.util.List;
@@ -32,8 +31,6 @@ public class CanvasPanel extends JPanel {
     // 標籤相關 (比記憶體位置是否相同)
     private Map<Object, String> shapeLabels = new IdentityHashMap<>();
     private Map<Object, Color> shapeLabelColors = new IdentityHashMap<>();
-    private Map<Object, Boolean> shapeLabelFlipX = new IdentityHashMap<>();
-    private Map<Object, Boolean> shapeLabelFlipY = new IdentityHashMap<>();
 
     // port 相關
     private Map<Object, ArrayList<Port>> shapePortsMap;
@@ -67,10 +64,6 @@ public class CanvasPanel extends JPanel {
         // label 預設空字串，顏色與背景一樣
         shapeLabels.put(obj, "");
         shapeLabelColors.put(obj, Color.LIGHT_GRAY);
-        
-        // 標籤翻轉
-        // shapeLabelFlipX.put(obj, false);
-        // shapeLabelFlipY.put(obj, false);
 
         updateShapePorts(obj); // 將新增的物件建立 ports
         repaint(); // 充新繪製圖形
@@ -86,8 +79,6 @@ public class CanvasPanel extends JPanel {
     private void drawLabel(Graphics2D g2d, Object obj) {
         String label = shapeLabels.get(obj);
         Color labelColor = shapeLabelColors.get(obj);
-        // Boolean flipX = shapeLabelFlipX.get(obj);
-        // Boolean flipY = shapeLabelFlipY.get(obj);
 
         if (label != null && labelColor != null) {
             Rectangle bounds = getShapeBounds(obj);
@@ -100,19 +91,6 @@ public class CanvasPanel extends JPanel {
             int textWidth = fm.stringWidth(label);
             int textHeight = fm.getHeight();
             int padding = 4;
-
-            // 儲存原始變換狀態
-            // AffineTransform originalTransform = g2d.getTransform();
-
-            // 應用翻轉
-            // g2d.translate(lx, ly); // 暫時將座標原點移至 label 中心
-            // // if (flipX != null && flipX) {
-            // //     g2d.scale(-1, 1);
-            // // }
-            // // if (flipY != null && flipY) {
-            // //     g2d.scale(1, -1);
-            // // }
-            // g2d.translate(-lx, -ly); // 將座標中心移回來
 
             // 繪製 label 背景
             g2d.setColor(labelColor);
@@ -130,9 +108,6 @@ public class CanvasPanel extends JPanel {
                 lx - textWidth / 2,
                 ly + fm.getAscent() / 2
             ); // drawString(要寫的字串, 最左下的 x 座標, 最左下的 y 座標)
-
-            // 恢復原始狀態
-            // g2d.setTransform(originalTransform);
         }
     }
 
@@ -794,38 +769,54 @@ public class CanvasPanel extends JPanel {
         // 滑鼠被放開時
         @Override
         public void mouseReleased(MouseEvent e) {
+            // 清空 resizingPort, resizingShape 和 resizeAncor
             resizingPort = null;
             resizingShape = null;
             resizeAnchor = null;
-            dragging = false;
 
+            dragging = false; // 沒有再拖曳了
+
+            // 如果剛剛是畫線
             if (tempStartPort != null) {
                 Port endPort = findPortAt(e.getX(), e.getY());
+                
+                // 不能自己連自己
                 if (endPort != null && endPort.getParentShape() != tempStartPort.getParentShape()) {
                     addLine(new Line(tempStartPort, endPort, currentMode));
                     System.out.println("Line created between different shapes.");
                 } else {
                     System.out.println("Line creation cancelled (invalid end point or same shape).");
                 }
+
+                // 清空 tempStartPort 和 tempLineEnd
                 tempStartPort = null;
                 tempLineEnd = null;
+
                 repaint();
-            } else if ("select".equals(currentMode) && rubberBandStart != null) {
+            } 
+            // 如果剛剛是選擇框框框住很多物件
+            else if ("select".equals(currentMode) && rubberBandStart != null) {
                 Rectangle finalRect = rubberBandRect;
+                
                 if (finalRect != null && finalRect.width > 5 && finalRect.height > 5) {
                     for (Object shape : shapes) {
                         Rectangle bounds = getShapeBounds(shape);
+                        
+                        // 每個在 shapes 裡面的 Object 都看看是不是被框框框住了
                         if (bounds != null && finalRect.intersects(bounds)) {
                             if (!selectedShapes.contains(shape)) {
-                                selectedShapes.add(shape);
+                                selectedShapes.add(shape); // 是的話，將這個圖形加進 selectedShapes 裡面
                             }
                         }
                     }
                 } else {
-                    selectedShapes.clear();
+                    selectedShapes.clear(); // 清空 selectedShapes
                 }
+
+                // 清空 rubberBandStart 和 rubberBandRect
                 rubberBandStart = null;
                 rubberBandRect = null;
+
                 repaint();
                 System.out.println("Selected " + selectedShapes.size() + " objects");
             }
@@ -855,7 +846,15 @@ public class CanvasPanel extends JPanel {
     }
 
     // getters
-    public List<Object> getSelectedShapes() { return selectedShapes; }
-    public Map<Object, String> getShapeLabels() { return shapeLabels; }
-    public Map<Object, Color> getShapeLabelColors() { return shapeLabelColors; }
+    public List<Object> getSelectedShapes() { 
+        return selectedShapes; 
+    }
+    
+    public Map<Object, String> getShapeLabels() { 
+        return shapeLabels; 
+    }
+    
+    public Map<Object, Color> getShapeLabelColors() { 
+        return shapeLabelColors; 
+    }
 }

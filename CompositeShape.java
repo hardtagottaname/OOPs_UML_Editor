@@ -2,7 +2,6 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 
-// import org.w3c.dom.css.Rect;
 
 // composite
 public class CompositeShape extends Rectangle implements ShapeInterface {
@@ -60,16 +59,6 @@ public class CompositeShape extends Rectangle implements ShapeInterface {
     public boolean contains(int mx, int my) {
         return super.contains(mx, my);
     }
-
-
-    // override 掉 ShapeInterface 的 updateBounds，改變
-    // @Override
-    // public void updateBounds(int x, int y, int width, int height) {
-    //     this.x = x;
-    //     this.y = y;
-    //     this.width = width;
-    //     this.height = height;
-    // }
 
 
     //  getter 

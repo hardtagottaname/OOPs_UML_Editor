@@ -38,24 +38,38 @@ public class MutableOval implements ShapeInterface {
         return new Rectangle(x, y, width, height);
     }
 
-    // 更新因為拉伸而變化的橢圓形最外面的矩形邊界 (繼承 ShapeInterface)
-    // @Override
-    // public void updateBounds(int x, int y, int width, int height) {
-    //     this.x = x;
-    //     this.y = y;
-    //     this.width = width;
-    //     this.height = height;
-    // }
-
     // getter
-    public int getX() { return x; }
-    public int getY() { return y; }
-    public int getWidth() { return width; }
-    public int getHeight() { return height; }
+    public int getX() { 
+        return x; 
+    }
+    
+    public int getY() { 
+        return y; 
+    }
+    
+    public int getWidth() { 
+        return width; 
+    }
+    
+    public int getHeight() { 
+        return height; 
+    }
+    
 
     //setter
-    public void setX(int x) { this.x = x; }
-    public void setY(int y) { this.y = y; }
-    public void setWidth(int width) { this.width = width; }
-    public void setHeight(int height) { this.height = height; }
+    public void setX(int x) { 
+        this.x = x; 
+    }
+    
+    public void setY(int y) { 
+        this.y = y; 
+    }
+    
+    public void setWidth(int width) { 
+        this.width = width; 
+    }
+    
+    public void setHeight(int height) { 
+        this.height = height; 
+    }
 }
