@@ -25,6 +25,7 @@ public class CanvasPanel extends JPanel {
     private Point tempLineEnd = null;
 
     // 調整大小相關
+    private Point resizeAnchor = null;
     private Port resizingPort = null;
     private Object resizingShape = null;
 
@@ -545,81 +546,55 @@ public class CanvasPanel extends JPanel {
         return result;
     }
 
+    private Point getAnchorPoint(Object shape, Port port) {
+        Rectangle b = getShapeBounds(shape);
+
+        switch (port.getType()) {
+            case 0: 
+                return new Point(b.x + b.width, b.y + b.height); // 左上 → 右下
+            case 1: 
+                return new Point(b.x + b.width / 2, b.y + b.height); 
+            case 2: 
+                return new Point(b.x, b.y + b.height);
+            case 3: 
+                return new Point(b.x, b.y + b.height / 2);
+            case 4: 
+                return new Point(b.x, b.y);
+            case 5: 
+                return new Point(b.x + b.width / 2, b.y);
+            case 6: 
+                return new Point(b.x + b.width, b.y);
+            case 7: 
+                return new Point(b.x + b.width, b.y + b.height / 2);
+        }
+
+        return null;
+    }
+
     // 更新 shape 的大小或位置
     private void resizeShape(Object shape, Port port, int mx, int my) {
         int minSize = 30;
 
         if (shape instanceof Rectangle) {
             Rectangle rect = (Rectangle) shape;
-            int x1 = rect.x;
-            int y1 = rect.y;
+
+            int newLeft   = Math.min(resizeAnchor.x, mx);
+            int newRight  = Math.max(resizeAnchor.x, mx);
+            int newTop    = Math.min(resizeAnchor.y, my);
+            int newBottom = Math.max(resizeAnchor.y, my);
             
-            int x2 = rect.x + rect.width;
-            int y2 = rect.y + rect.height;
-
-            int newLeft = x1, newTop = y1, newRight = x2, newBottom = y2;
-
-            switch (port.getType()) {
-                case 0: 
-                    newLeft = mx; 
-                    newTop = my; 
-                    break;
-                case 1: 
-                    newTop = my; 
-                    break;
-                case 2: 
-                    newTop = my; 
-                    newRight = mx; 
-                    break;
-                case 3: 
-                    newRight = mx; 
-                    break;
-                case 4: 
-                    newRight = mx; 
-                    newBottom = my; 
-                    break;
-                case 5: 
-                    newBottom = my; 
-                    break;
-                case 6: 
-                    newLeft = mx; 
-                    newBottom = my; 
-                    break;
-                case 7: 
-                    newLeft = mx; 
-                    break;
-            }
-
-            if (newRight < newLeft) {
-                int temp = newLeft;
-                newLeft = newRight;
-                newRight = temp;
-            }
-
-            if (newBottom < newTop) {
-                int temp = newTop;
-                newTop = newBottom;
-                newBottom = temp;
-            }
-
-            int newX = Math.min(newLeft, newRight);
-            int newY = Math.min(newTop, newBottom);
-
             int newW = newRight - newLeft;
             int newH = newBottom - newTop;
 
-            if (newW < minSize) {
-                newW = minSize;
-            } else {
-                rect.x = newX;
-            }
+            if (newW < minSize) newW = minSize;
+            if (newH < minSize) newH = minSize;
 
-            if (newH < minSize) {
-                newH = minSize;
-            } else {
-                rect.y = newY;
-            }
-
+            rect.x = newLeft;
+            rect.y = newTop;
+            rect.width  = newW;
+            rect.height = newH;
+            
+            
             rect.width = newW;
             rect.height = newH;
             updateShapePorts(rect);
@@ -716,6 +691,7 @@ public class CanvasPanel extends JPanel {
                     if (!(port.getParentShape() instanceof CompositeShape)) {
                         resizingPort = port; // 更新 Port resizingPort
                         resizingShape = port.getParentShape(); // 更新 Object resizingShape
+                        resizeAnchor = getAnchorPoint(resizingShape, port);
                         return;
                     }
                 }
