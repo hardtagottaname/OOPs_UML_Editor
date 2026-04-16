@@ -719,6 +719,7 @@ public class CanvasPanel extends JPanel {
                 return;
             }
 
+            // 移動 composite, rect, oval
             if ("select".equals(currentMode) && rubberBandStart == null && !selectedShapes.isEmpty()) {
                 // 計算被移動的距離
                 int deltaX = currentPoint.x - lastMousePoint.x;
