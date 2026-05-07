@@ -1,142 +1,114 @@
-import java.awt.*;
+import java.awt.Point;
+import java.awt.Rectangle;
 
 public class Port {
+    private static final int HIT_SIZE = 8;
 
-    // x, y => port 座標
-    // parentShape => port 所屬的形狀 (矩形或橢圓)
-    // type => port 的類型 (矩形有 8 個 port，橢圓有 4 個 port)
-    private int x, y;
-    private Object parentShape;
-    private int type; 
+    private final UMLObject parentShape;
+    private final int type;
+    private int x;
+    private int y;
 
-    // constructor
-    public Port(Object parentShape, int type) {
+    public Port(UMLObject parentShape, int type) {
         this.parentShape = parentShape;
         this.type = type;
-        updatePosition();
     }
 
-    
     public void updatePosition() {
+        Rectangle b = parentShape.getBounds();
+        int cx = b.x + b.width / 2;
+        int cy = b.y + b.height / 2;
 
-        System.out.println("Updating port position for type " + type + " of parent shape: " + parentShape.getClass().getSimpleName());
-
-        // 若為矩形
-        if (parentShape instanceof Rectangle) {
-
-            // 將 Object 轉型為 Rectangle 並獲取其邊界
-            Rectangle bounds = ((Rectangle) parentShape).getBounds();
-            int cx = bounds.x + bounds.width / 2;
-            int cy = bounds.y + bounds.height / 2;
-
-            // 矩形：8個方向 (0-7) => 順時鐘
+        if (parentShape.getPorts().size() == 8) {
             switch (type) {
-                case 0: // 左上
-                    x = bounds.x;
-                    y = bounds.y;
+                case 0:
+                    x = b.x;
+                    y = b.y;
                     break;
-                case 1: // 上中
+                case 1:
                     x = cx;
-                    y = bounds.y;
+                    y = b.y;
                     break;
-                case 2: // 右上
-                    x = bounds.x + bounds.width;
-                    y = bounds.y;
+                case 2:
+                    x = b.x + b.width;
+                    y = b.y;
                     break;
-                case 3: // 右中
-                    x = bounds.x + bounds.width;
+                case 3:
+                    x = b.x + b.width;
                     y = cy;
                     break;
-                case 4: // 右下
-                    x = bounds.x + bounds.width;
-                    y = bounds.y + bounds.height;
+                case 4:
+                    x = b.x + b.width;
+                    y = b.y + b.height;
                     break;
-                case 5: // 下中
+                case 5:
                     x = cx;
-                    y = bounds.y + bounds.height;
+                    y = b.y + b.height;
                     break;
-                case 6: // 左下
-                    x = bounds.x;
-                    y = bounds.y + bounds.height;
+                case 6:
+                    x = b.x;
+                    y = b.y + b.height;
                     break;
-                case 7: // 左中
-                    x = bounds.x;
+                case 7:
+                    x = b.x;
                     y = cy;
                     break;
-                default: // 防呆
+                default:
                     x = cx;
-                    y = cy; 
+                    y = cy;
+                    break;
             }
-        } 
-        // 若為橢圓形
-        else if (parentShape instanceof MutableOval) {
-
-            // 將 Object 轉型為 MutableOval 並獲取其中心點
-            MutableOval oval = (MutableOval) parentShape;
-            int cx = oval.getX() + oval.getWidth() / 2;
-            int cy = oval.getY() + oval.getHeight() / 2;
-
-            // 橢圓：4個方向 (0-3) => 順時鐘
+        } else {
             switch (type) {
-                case 0: // 上
-                    x = cx; 
-                    y = oval.getY(); 
-                    break; 
-                case 1: // 右
-                    x = oval.getX() + oval.getWidth(); 
-                    y = cy; 
-                    break;  
-                case 2: // 下
-                    x = cx; 
-                    y = oval.getY() + oval.getHeight(); 
-                    break; 
-                case 3: // 左
-                    x = oval.getX(); 
-                    y = cy; 
-                    break; 
-                default: // 防呆
-                    x = cx; 
+                case 0:
+                    x = cx;
+                    y = b.y;
+                    break;
+                case 1:
+                    x = b.x + b.width;
                     y = cy;
+                    break;
+                case 2:
+                    x = cx;
+                    y = b.y + b.height;
+                    break;
+                case 3:
+                    x = b.x;
+                    y = cy;
+                    break;
+                default:
+                    x = cx;
+                    y = cy;
+                    break;
             }
         }
     }
 
     public boolean contains(int mx, int my) {
-        return Math.abs(mx - x) <= 5 && Math.abs(my - y) <= 5;
+        updatePosition();
+        return Math.abs(mx - x) <= HIT_SIZE && Math.abs(my - y) <= HIT_SIZE;
     }
 
-    // getter
-    public int getX() { 
-        return x; 
+    public Point getLocation() {
+        updatePosition();
+        return new Point(x, y);
     }
 
-    public int getY() { 
-        return y; 
+    public int getX() {
+        updatePosition();
+        return x;
     }
 
-    public Object getParentShape() {
-        return parentShape; 
+    public int getY() {
+        updatePosition();
+        return y;
     }
-    
+
+    public UMLObject getParentShape() {
+        return parentShape;
+    }
+
     public int getType() {
-        return type; 
-    }
-
-    
-    // setter
-    public void setX(int x) {
-        this.x = x; 
-    }
-    
-    public void setY(int y) { 
-        this.y = y; 
-    }
-
-    public void setParentShape(Object parentShape) { 
-        this.parentShape = parentShape; 
-    }
-    
-    public void setType(int type) { 
-        this.type = type; 
+        return type;
     }
 }

@@ -1,32 +1,41 @@
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.*;
+import javax.swing.JButton;
+import javax.swing.JColorChooser;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.GridLayout;
+import java.awt.Point;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
-
-// 初始化介面和整體的狀態
 public class Main extends JFrame {
-    // UI
     private JPanel buttonPanel;
     private CanvasPanel canvasPanel;
+    private JButton lastActiveButton;
+    private JButton previousActiveButton;
 
-    // 按鈕
-    // 紀錄上一個按的是誰
-    private JButton lastActiveButton = null;
-    private JButton previousActiveButton = null;
-
-    // main function 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            new Main().setVisible(true); // 讓整個 UI visible
-        });
+        SwingUtilities.invokeLater(() -> new Main().setVisible(true));
     }
 
-    // constructor
     public Main() {
-        setTitle("OOPS_UML_Editor");
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE); // 按下叉叉就離開 
+        setTitle("OOPS UML Editor");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1200, 700);
-        setLayout(new BorderLayout()); // 把介面分成北中南西東
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
 
         initializeComponents();
         setupMenuBar();
@@ -35,44 +44,32 @@ public class Main extends JFrame {
         add(canvasPanel, BorderLayout.CENTER);
     }
 
-    // 初始化 UI
     private void initializeComponents() {
         canvasPanel = new CanvasPanel();
         canvasPanel.setBackground(Color.LIGHT_GRAY);
 
-        buttonPanel = new JPanel();
-        buttonPanel.setLayout(new GridLayout(6, 1, 5, 5)); // 讓 button 變成一個 column，六個元素，六個平均分配在 column 中，每個垂直水平間隔 5 pixel
-        buttonPanel.setPreferredSize(new Dimension(120, 0)); // 讓 buttons 的寬度是 120 pixel，高度充滿父元素
+        buttonPanel = new JPanel(new GridLayout(6, 1, 5, 5));
+        buttonPanel.setPreferredSize(new Dimension(120, 0));
 
-        String[] buttonLabels = {"select", "association", "generalization", "composition", "rect", "oval"};
-
-        // 把 button 加進 buttonPanel
-        for (String label : buttonLabels) {
-            JButton btn = new JButton(label);
-            btn.addActionListener(new ButtonClickListener());
-            btn.addMouseListener(new ButtonMouseHandler(btn));
-            buttonPanel.add(btn);
+        String[] labels = {"select", "association", "generalization", "composition", "rect", "oval"};
+        for (String label : labels) {
+            JButton button = new JButton(label);
+            button.addMouseListener(new ToolButtonHandler(button));
+            buttonPanel.add(button);
+            if ("select".equals(label)) {
+                lastActiveButton = button;
+                setButtonActive(button, true);
+            }
         }
     }
 
-    // 初始化 menuBar
     private void setupMenuBar() {
         JMenuBar menuBar = new JMenuBar();
         Font menuFont = new Font("Arial", Font.PLAIN, 14);
 
-        // 檔案選單
         JMenu fileMenu = new JMenu("File");
         fileMenu.setFont(menuFont);
 
-        // JMenuItem newItem = new JMenuItem("new");
-        // JMenuItem openItem = new JMenuItem("open");
-        // JMenuItem saveItem = new JMenuItem("save");
-        
-        // fileMenu.add(newItem);
-        // fileMenu.add(openItem);
-        // fileMenu.add(saveItem);
-
-        // 編輯選單
         JMenu editMenu = new JMenu("Edit");
         editMenu.setFont(menuFont);
 
@@ -90,151 +87,125 @@ public class Main extends JFrame {
 
         menuBar.add(fileMenu);
         menuBar.add(editMenu);
-
         setJMenuBar(menuBar);
     }
 
-    // 顯示 edit -> label 時
     private void showLabelDialog() {
         if (canvasPanel.getSelectedShapes().size() != 1) {
-            JOptionPane.showMessageDialog(this, "要選一個物件!");
+            JOptionPane.showMessageDialog(this, "Please select exactly one basic object.");
             return;
         }
 
-        Object shape = canvasPanel.getSelectedShapes().get(0);
+        UMLObject object = canvasPanel.getSelectedShapes().get(0);
+        if (object instanceof CompositeShape) {
+            JOptionPane.showMessageDialog(this, "Label can only be customized for a basic object.");
+            return;
+        }
 
-        String currentName = canvasPanel.getShapeLabels().get(shape);
-        Color currentColor = canvasPanel.getShapeLabelColors().get(shape);
-
-        JTextField nameField = new JTextField(currentName);
-
-        JButton colorButton = new JButton("選色");
-        final Color[] selectedColor = {currentColor}; // 要讓後面的 lambda 能夠修改 selectedColor，所以要用 final
-
+        JTextField nameField = new JTextField(object.getName());
+        JButton colorButton = new JButton("Choose");
+        final Color[] selectedColor = {object.getLabelColor()};
+        colorButton.setBackground(selectedColor[0]);
         colorButton.addActionListener(e -> {
-            Color c = JColorChooser.showDialog(this, "選色", currentColor);
-            if (c != null) {
-                selectedColor[0] = c;
+            Color color = JColorChooser.showDialog(this, "Choose Label Color", selectedColor[0]);
+            if (color != null) {
+                selectedColor[0] = color;
+                colorButton.setBackground(color);
             }
         });
 
-        JPanel panel = new JPanel(new GridLayout(2, 2));
-        
-        panel.add(new JLabel("Name"));
+        JPanel panel = new JPanel(new GridLayout(2, 2, 8, 8));
+        panel.add(new JLabel("Label Name"));
         panel.add(nameField);
-
-        panel.add(new JLabel("Color"));
+        panel.add(new JLabel("Label Color"));
         panel.add(colorButton);
 
         int result = JOptionPane.showConfirmDialog(
-            this,
-            panel,
-            "Customize Label Style",
-            JOptionPane.OK_CANCEL_OPTION
-        ); // 選顏色的小視窗
+                this,
+                panel,
+                "Customize Label Style",
+                JOptionPane.OK_CANCEL_OPTION
+        );
 
-        // 如果確認，就更新 label string 和 color
         if (result == JOptionPane.OK_OPTION) {
-            canvasPanel.getShapeLabels().put(shape, nameField.getText());
-            canvasPanel.getShapeLabelColors().put(shape, selectedColor[0]);
+            object.setName(nameField.getText());
+            object.setLabelColor(selectedColor[0]);
             canvasPanel.repaint();
         }
     }
 
-    // 處理因為被按下 rect 或 oval 而變色的按鈕
-    private void resetButtonColors() {
-        for (Component comp : buttonPanel.getComponents()) {
-            if (comp instanceof JButton) {
-                JButton btn = (JButton) comp;
-
-                // 將按鈕變回預設
-                btn.setBackground(UIManager.getColor("Button.background"));
-                btn.setForeground(UIManager.getColor("Button.foreground"));
-            }
-        }
-
-        // 如果前一個被按下的按鈕不是 null，則更新 lasActiveButton 為他，否則為 null
-        if (previousActiveButton != null) {
-            lastActiveButton = previousActiveButton;
+    private void setButtonActive(JButton button, boolean active) {
+        if (active) {
+            button.setBackground(Color.BLACK);
+            button.setForeground(Color.WHITE);
         } else {
-            lastActiveButton = null;
+            button.setBackground(UIManager.getColor("Button.background"));
+            button.setForeground(UIManager.getColor("Button.foreground"));
         }
-
-        String mode = (previousActiveButton != null) ? previousActiveButton.getText() : "select"; // 將 mode 設為 previousActiveButton 否則設為 select
-        canvasPanel.setCurrentMode(mode);
-        previousActiveButton = null; // 更新 previousActiveButton
-
-        System.out.println("Mode reverted to: " + mode);
     }
 
-    // 這裡只處理 rect 和 oval， CanvasPanel 才處理其他
-    private class ButtonMouseHandler extends MouseAdapter {
-        private JButton button;
+    private void clearButtonStates() {
+        for (Component component : buttonPanel.getComponents()) {
+            if (component instanceof JButton) {
+                setButtonActive((JButton) component, false);
+            }
+        }
+    }
 
-        public ButtonMouseHandler(JButton button) {
+    private void activateTool(JButton button) {
+        clearButtonStates();
+        setButtonActive(button, true);
+        lastActiveButton = button;
+        canvasPanel.setCurrentMode(button.getText());
+    }
+
+    private class ToolButtonHandler extends MouseAdapter {
+        private final JButton button;
+
+        ToolButtonHandler(JButton button) {
             this.button = button;
         }
 
-        // 滑鼠按下時
         @Override
         public void mousePressed(MouseEvent e) {
-            String buttonText = button.getText();
-
-            // 如果是按下 rect 或 oval，要復原回前一個按鈕
-            if ("rect".equals(buttonText) || "oval".equals(buttonText)) {
+            String mode = button.getText();
+            if ("rect".equals(mode) || "oval".equals(mode)) {
                 previousActiveButton = lastActiveButton;
-
-                // 其他按鈕維持預設樣式
-                if (lastActiveButton != null) {
-                    System.out.println("Resetting button: " + lastActiveButton.getText());
-                    lastActiveButton.setBackground(UIManager.getColor("Button.background"));
-                    lastActiveButton.setForeground(UIManager.getColor("Button.foreground"));
-                }
-
-                // rect 或 oval 變黑色
-                button.setBackground(Color.BLACK);
-                button.setForeground(Color.WHITE);
-                lastActiveButton = button;
+                clearButtonStates();
+                setButtonActive(button, true);
+                canvasPanel.setCurrentMode(mode);
+            } else {
+                previousActiveButton = null;
+                activateTool(button);
             }
-
-            canvasPanel.setCurrentMode(buttonText);
-            System.out.println("Mode changed to: " + buttonText);
         }
 
-        // 滑鼠放開時
         @Override
         public void mouseReleased(MouseEvent e) {
-            String mode = canvasPanel.getCurrentMode();
-            
-            if ("rect".equals(mode) || "oval".equals(mode)) {
-                Point canvasPoint = SwingUtilities.convertPoint(button, e.getPoint(), canvasPanel); // 把滑鼠在 button 上的位置轉成在 canvas 上的位置 convertPoint(來源元素, 點, 目標元素)
+            String mode = button.getText();
+            if (!"rect".equals(mode) && !"oval".equals(mode)) {
+                return;
+            }
 
-                int width = 100;
-                int height = 60;
-                int x = canvasPoint.x - width / 2;
-                int y = canvasPoint.y - height / 2;
+            Point canvasPoint = SwingUtilities.convertPoint(button, e.getPoint(), canvasPanel);
+            if (canvasPanel.contains(canvasPoint)) {
+                canvasPanel.createShapeAt(mode, canvasPoint);
+            }
 
-                if ("oval".equals(mode)) {
-                    canvasPanel.addShape(new MutableOval(x, y, width, height));
-                } else if ("rect".equals(mode)) {
-                    canvasPanel.addShape(new Rectangle(x, y, width, height));
+            clearButtonStates();
+            if (previousActiveButton != null) {
+                setButtonActive(previousActiveButton, true);
+                lastActiveButton = previousActiveButton;
+                canvasPanel.setCurrentMode(previousActiveButton.getText());
+            } else {
+                Component first = buttonPanel.getComponent(0);
+                if (first instanceof JButton) {
+                    lastActiveButton = (JButton) first;
+                    setButtonActive(lastActiveButton, true);
+                    canvasPanel.setCurrentMode("select");
                 }
-
-                resetButtonColors(); // 更新 button 顏色和 previousbutton, lastbutton 狀態
             }
-        }
-    }
-
-    // 處理滑鼠完整點擊 (因為 select 相對簡單，不需要紀錄按下和放開等等，用 actionlistener 就好)
-    private class ButtonClickListener implements ActionListener {
-        @Override
-        public void actionPerformed(ActionEvent e) {
-            String buttonName = e.getActionCommand();
-
-            if ("select".equals(buttonName)) {
-                resetButtonColors();
-                canvasPanel.setCurrentMode("select");
-            }
+            previousActiveButton = null;
         }
     }
 }

@@ -1,74 +1,103 @@
-import java.awt.*;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.Rectangle;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
+public class CompositeShape implements UMLObject {
+    private final List<UMLObject> children;
+    private int depth;
 
-// composite
-public class CompositeShape extends Rectangle implements ShapeInterface {
-
-    // composite 裡面的物件列表
-    private List<Object> children;
-
-    // constructor
-    public CompositeShape(List<Object> children) {
+    public CompositeShape(List<UMLObject> children) {
         this.children = new ArrayList<>(children);
-        updateBoundsOnly();
     }
 
-    // 圈出 composite 的左上和右下點     
-    public void updateBoundsOnly() {
-
-        int minX = Integer.MAX_VALUE;
-        int minY = Integer.MAX_VALUE;
-        int maxX = Integer.MIN_VALUE;
-        int maxY = Integer.MIN_VALUE;
-
-        for (Object obj : children) {
-            Rectangle bounds = null;
-
-            // 如果是矩形，取矩形的邊界
-            if (obj instanceof Rectangle) {
-                bounds = ((Rectangle) obj).getBounds();
-                System.out.println("Updating bounds for child: " + obj.getClass().getSimpleName() + " with bounds: " + bounds);
-            } 
-            // 如果是橢圓形，取橢圓形外面的邊界矩形
-            else if (obj instanceof MutableOval) {
-                bounds = ((MutableOval) obj).getBounds();
-            }
-
-            // 將剛剛得到的 bounds 用來更新 composite 的邊界
-            if (bounds != null) {
-                minX = Math.min(minX, bounds.x);
-                minY = Math.min(minY, bounds.y);
-                maxX = Math.max(maxX, bounds.x + bounds.width);
-                maxY = Math.max(maxY, bounds.y + bounds.height);
-            }
-        }
-
-        // 更新 composite 的寬跟高及位置
-        width = maxX - minX;
-        height = maxY - minY;
-        this.x = minX;
-        this.y = minY;
+    public List<UMLObject> getChildren() {
+        return Collections.unmodifiableList(children);
     }
 
-
-    // 點擊 composite 的時候，檢查點是否在 composite 的邊界內
-    // override 掉 ShapeInterface 的 conatins
     @Override
-    public boolean contains(int mx, int my) {
-        return super.contains(mx, my);
+    public void draw(Graphics2D g2d) {
+        for (UMLObject child : children) {
+            child.draw(g2d);
+        }
     }
 
-
-    //  getter 
-    public List<Object> getChildren() {
-        return children;
+    public void drawSelection(Graphics2D g2d) {
+        Rectangle b = getBounds();
+        g2d.setColor(new Color(40, 100, 210));
+        g2d.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
+                10.0f, new float[]{5.0f}, 0.0f));
+        g2d.drawRect(b.x - 3, b.y - 3, b.width + 6, b.height + 6);
     }
-    
+
+    @Override
+    public boolean contains(Point p) {
+        return getBounds().contains(p);
+    }
+
     @Override
     public Rectangle getBounds() {
-        return this;
+        if (children.isEmpty()) {
+            return new Rectangle();
+        }
+
+        Rectangle bounds = new Rectangle(children.get(0).getBounds());
+        for (int i = 1; i < children.size(); i++) {
+            bounds = bounds.union(children.get(i).getBounds());
+        }
+        return bounds;
     }
 
+    @Override
+    public void move(int dx, int dy) {
+        for (UMLObject child : children) {
+            child.move(dx, dy);
+        }
+    }
+
+    @Override
+    public String getName() {
+        return "";
+    }
+
+    @Override
+    public void setName(String name) {
+    }
+
+    @Override
+    public Color getLabelColor() {
+        return Color.LIGHT_GRAY;
+    }
+
+    @Override
+    public void setLabelColor(Color color) {
+    }
+
+    @Override
+    public List<Port> getPorts() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public Port getNearestPort(Point p) {
+        return null;
+    }
+
+    @Override
+    public void resize(Port port, Point anchor, Point draggedPoint, int minSize) {
+    }
+
+    @Override
+    public int getDepth() {
+        return depth;
+    }
+
+    @Override
+    public void setDepth(int depth) {
+        this.depth = depth;
+    }
 }
