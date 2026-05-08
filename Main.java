@@ -20,13 +20,24 @@ import java.awt.Point;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
+/**
+ * UML 編輯器的主視窗。
+ *
+ * 負責建立 Swing 視窗、左側工具列、上方選單，以及把使用者在工具列上的操作
+ * 轉交給 CanvasPanel 執行。
+ */
 public class Main extends JFrame {
+    // 左側垂直工具列，放 select、line、shape 等工具按鈕。
     private JPanel buttonPanel;
+    // 中央畫布，所有 UML 圖形、連線、選取與拖曳都在這裡處理。
     private CanvasPanel canvasPanel;
+    // 目前常駐啟用的工具按鈕，例如 select 或 association。
     private JButton lastActiveButton;
+    // 建立圖形時暫存前一個工具，放開滑鼠後會切回它。
     private JButton previousActiveButton;
 
     public static void main(String[] args) {
+        // Swing 元件必須在 Event Dispatch Thread 上建立與更新。
         SwingUtilities.invokeLater(() -> new Main().setVisible(true));
     }
 
@@ -44,6 +55,12 @@ public class Main extends JFrame {
         add(canvasPanel, BorderLayout.CENTER);
     }
 
+    /**
+     * 建立畫布與左側工具按鈕。
+     *
+     * rect / oval 採用「按住工具按鈕、拖到畫布放開」的建立方式，
+     * 其他工具則是點一下後持續切換模式。
+     */
     private void initializeComponents() {
         canvasPanel = new CanvasPanel();
         canvasPanel.setBackground(Color.LIGHT_GRAY);
@@ -63,6 +80,9 @@ public class Main extends JFrame {
         }
     }
 
+    /**
+     * 建立選單列，目前 Edit 選單提供群組、解散群組與修改標籤樣式。
+     */
     private void setupMenuBar() {
         JMenuBar menuBar = new JMenuBar();
         Font menuFont = new Font("Arial", Font.PLAIN, 14);
@@ -90,6 +110,9 @@ public class Main extends JFrame {
         setJMenuBar(menuBar);
     }
 
+    /**
+     * 顯示標籤設定對話框，讓使用者修改單一基本圖形的名稱與標籤底色。
+     */
     private void showLabelDialog() {
         if (canvasPanel.getSelectedShapes().size() != 1) {
             JOptionPane.showMessageDialog(this, "Please select exactly one basic object.");
@@ -134,6 +157,9 @@ public class Main extends JFrame {
         }
     }
 
+    /**
+     * 用黑底白字表示工具按鈕啟用，否則恢復系統預設按鈕顏色。
+     */
     private void setButtonActive(JButton button, boolean active) {
         if (active) {
             button.setBackground(Color.BLACK);
@@ -144,6 +170,9 @@ public class Main extends JFrame {
         }
     }
 
+    /**
+     * 清除所有工具按鈕的視覺啟用狀態。
+     */
     private void clearButtonStates() {
         for (Component component : buttonPanel.getComponents()) {
             if (component instanceof JButton) {
@@ -152,6 +181,9 @@ public class Main extends JFrame {
         }
     }
 
+    /**
+     * 切換目前工具，並同步更新按鈕狀態與畫布模式。
+     */
     private void activateTool(JButton button) {
         clearButtonStates();
         setButtonActive(button, true);
@@ -159,6 +191,12 @@ public class Main extends JFrame {
         canvasPanel.setCurrentMode(button.getText());
     }
 
+    /**
+     * 工具按鈕的滑鼠處理器。
+     *
+     * 一般工具按下後直接切換模式；圖形工具則在按下時暫時啟用，
+     * 放開時若位置落在畫布內就建立圖形，最後回復到前一個工具。
+     */
     private class ToolButtonHandler extends MouseAdapter {
         private final JButton button;
 

@@ -1,12 +1,17 @@
 import java.awt.Rectangle;
 
-// 自定義橢圓形
+/**
+ * 可改變位置與大小的橢圓資料物件。
+ *
+ * 這是較簡化的舊版 shape 實作，只提供座標、大小、命中測試與外框資訊；
+ * 目前新版 UML use case 圖形則由 UseCaseObject 負責。
+ */
 public class MutableOval implements ShapeInterface {
 
-    // x, y 是橢圓的左上角座標(包住橢圓形的那塊矩形的最左上角的點)
+    // 橢圓外接矩形的左上角座標與寬高。
     private int x, y, width, height;
 
-    // contructor
+    /** 建立一個指定外接矩形的橢圓。 */
     public MutableOval(int x, int y, int width, int height) {
         this.x = x;
         this.y = y;
@@ -14,7 +19,11 @@ public class MutableOval implements ShapeInterface {
         this.height = height;
     }
 
-    // 點擊的點是否在橢圓範圍內 (繼承 ShapeInterface)
+    /**
+     * 判斷指定座標是否位於橢圓內。
+     *
+     * 先用外接矩形快速排除不可能命中的點，再用標準橢圓方程式做精準判斷。
+     */
     @Override
     public boolean contains(int mx, int my) {
         if (mx < x || mx > x + width || my < y || my > y + height) {
@@ -31,45 +40,49 @@ public class MutableOval implements ShapeInterface {
         return ((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry)) <= 1;
     }
 
-    
-    // 取得橢圓形最外面的矩形邊界 (繼承 ShapeInterface)
+    /** 回傳橢圓的外接矩形。 */
     @Override
     public Rectangle getBounds() {
         return new Rectangle(x, y, width, height);
     }
 
-    // getter
-    public int getX() { 
-        return x; 
+    /** 回傳左上角 x 座標。 */
+    public int getX() {
+        return x;
     }
-    
-    public int getY() { 
-        return y; 
-    }
-    
-    public int getWidth() { 
-        return width; 
-    }
-    
-    public int getHeight() { 
-        return height; 
-    }
-    
 
-    //setter
-    public void setX(int x) { 
-        this.x = x; 
+    /** 回傳左上角 y 座標。 */
+    public int getY() {
+        return y;
     }
-    
-    public void setY(int y) { 
-        this.y = y; 
+
+    /** 回傳寬度。 */
+    public int getWidth() {
+        return width;
     }
-    
-    public void setWidth(int width) { 
-        this.width = width; 
+
+    /** 回傳高度。 */
+    public int getHeight() {
+        return height;
     }
-    
-    public void setHeight(int height) { 
-        this.height = height; 
+
+    /** 設定左上角 x 座標。 */
+    public void setX(int x) {
+        this.x = x;
+    }
+
+    /** 設定左上角 y 座標。 */
+    public void setY(int y) {
+        this.y = y;
+    }
+
+    /** 設定寬度。 */
+    public void setWidth(int width) {
+        this.width = width;
+    }
+
+    /** 設定高度。 */
+    public void setHeight(int height) {
+        this.height = height;
     }
 }
