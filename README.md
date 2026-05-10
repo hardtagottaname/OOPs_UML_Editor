@@ -1,9 +1,9 @@
 # OOPs_UML_Editor
 
 ```
-javac *.java
+javac Main.java
 ```
 
 ```
-java Main
+java Main.java
 ```
