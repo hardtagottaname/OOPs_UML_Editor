@@ -12,6 +12,7 @@ public class Port {
     private static final int HIT_SIZE = 8;
 
     // Port 所屬的 UML 圖形。
+    // 用的是 polymorphism，只要有實作 UMLObject 這個 interface 就可以，不用管他是什麼類型的圖形。
     private final UMLObject parentShape;
     // Port 的位置編號；矩形有 8 個，橢圓有 4 個。
     private final int type;
